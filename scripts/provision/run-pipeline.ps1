@@ -37,7 +37,7 @@ function Invoke-SocoolProvisionPipeline {
     param(
         [Parameter(Mandatory)][ValidateSet('virtualbox','libvirt')][string]$Hypervisor,
         [Parameter(Mandatory)][ValidateSet('nessus','openvas','none')][string]$Scanner,
-        [Parameter(Mandatory)][ValidateSet('msdev','iso')][string]$WindowsSource
+        [Parameter(Mandatory)][ValidateSet('eval','iso')][string]$WindowsSource
     )
 
     Write-SocoolInfo ("provision pipeline: hv={0} scanner={1} windows={2}" -f $Hypervisor, $Scanner, $WindowsSource)

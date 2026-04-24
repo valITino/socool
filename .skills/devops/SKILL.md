@@ -23,13 +23,13 @@ Trigger keywords: *hypervisor, VirtualBox, QEMU, KVM, libvirt, Vagrant provider,
 | Host OS | Arch | Primary | Fallback | Hard-blocked by |
 |---|---|---|---|---|
 | Linux | x86_64 | VirtualBox | QEMU/KVM (libvirt) | — |
-| Linux | aarch64 | QEMU/KVM | — | VirtualBox (no aarch64 support) |
+| Linux | aarch64 | QEMU/KVM | — | VirtualBox (no aarch64 Linux host support) |
 | macOS | x86_64 (Intel) | VirtualBox | QEMU | — |
-| macOS | aarch64 (Apple Silicon) | QEMU/UTM | — | VirtualBox (unsupported on Apple Silicon host as of 7.1) |
+| macOS | aarch64 (Apple Silicon) | QEMU/UTM | VirtualBox 7.2+ (caveats — see ADR-0002) | — |
 | Windows | x86_64 | VirtualBox | — | Hyper-V enabled, WSL2 using Hyper-V backend, Docker Desktop with WSL2 backend |
 | Windows | aarch64 | *unsupported* | — | — |
 
-Every release, re-verify this table via Phase 1 web research. Upstream compatibility changes frequently.
+Every release, re-verify this table via Phase 1 web research. Upstream compatibility changes frequently. Last verified: 2026-04-24 — VirtualBox 7.1+ now supports Apple Silicon hosts, but we keep QEMU as primary there because the lab's x86 guests need x86 emulation either way and 7.2.4 has known Windows-guest crash bugs.
 
 ### Hypervisor detection contract
 

@@ -2,13 +2,14 @@
 
 - **Status:** Accepted
 - **Date:** 2026-04-24
+- **Last verified:** 2026-04-24 (Phase 1 web research)
 - **Deciders:** SOCool maintainers (authored via the `devops`, `devsecops`, and `software-architect` skills)
 
 > **Phase 1 freshness notice.** The external compatibility claims in this
-> ADR were accurate at the authoring date. Hypervisor support changes
-> frequently — Apple Silicon VirtualBox status, Hyper-V + VirtualBox
-> interaction on Windows 11, and nested-virt availability on Linux
-> kernels all evolve. Re-verify this table at every release per
+> ADR are accurate at the "Last verified" date above. Hypervisor support
+> changes frequently — Apple Silicon VirtualBox status, Hyper-V +
+> VirtualBox interaction on Windows 11, and nested-virt availability on
+> Linux kernels all evolve. Re-verify this table at every release per
 > `CLAUDE.md`'s Phase 1 protocol.
 
 ## Context
@@ -38,14 +39,32 @@ and how does it communicate the reasons?
 | Host OS | Arch | Primary | Fallback | Hard-blocked by |
 |---|---|---|---|---|
 | Linux | x86_64 | VirtualBox | QEMU/KVM (libvirt) | — |
-| Linux | aarch64 | QEMU/KVM (libvirt) | — | VirtualBox (no aarch64 support) |
+| Linux | aarch64 | QEMU/KVM (libvirt) | — | VirtualBox (no aarch64 Linux host support) |
 | macOS | x86_64 (Intel) | VirtualBox | QEMU | — |
-| macOS | aarch64 (Apple Silicon) | QEMU / UTM | — | VirtualBox (limited aarch64 support at 7.1) |
+| macOS | aarch64 (Apple Silicon) | QEMU / UTM | VirtualBox 7.2+ (caveats below) | — |
 | Windows | x86_64 | VirtualBox | — | Hyper-V enabled, WSL2 using Hyper-V backend, Docker Desktop on WSL2 |
 | Windows | aarch64 | *unsupported* | — | — |
 
 This table is duplicated in `.skills/devops/SKILL.md` and `README.md`; all
 three must move together when it changes.
+
+**Apple Silicon note (2026-04-24 verification):** VirtualBox 7.1 added
+macOS aarch64 host support and 7.2 (current 7.2.8) continues it, so
+Apple Silicon is no longer hard-blocked by lack of host support. We
+still prefer QEMU on Apple Silicon because:
+
+1. The lab's pfSense and Windows-victim guests are x86_64 — VirtualBox
+   on Apple Silicon runs those under x86 emulation with significant
+   performance cost.
+2. VirtualBox 7.2.4 has been reported to crash Windows 11 guests at
+   startup on several host configurations; workarounds exist (switch
+   the VM's paravirtualization setting from Hyper-V to Legacy) but the
+   bug is a reliability concern for an unattended provisioner.
+3. QEMU has been stable on Apple Silicon for years and handles the
+   same x86 guests via TCG. Slower than native, but predictable.
+
+If a user sets `SOCOOL_HYPERVISOR=virtualbox` on Apple Silicon, we
+permit it (no longer a hard-fail) but log the caveats above.
 
 ### Hypervisor resolution algorithm
 
@@ -76,6 +95,23 @@ On Windows, we **detect and refuse**, not **detect and fix**. Rationale:
 - Even if we asked for consent, the next Windows update may re-enable
   Hyper-V automatically, silently un-fixing our fix.
 
+**Note on WHPX coexistence (2026-04-24 verification):** VirtualBox 7.1+
+with the Extension Pack can run on the Windows Hypervisor Platform
+(WHPX) while Hyper-V is active, so the technical answer to "can they
+coexist" is now yes. We still refuse this configuration because:
+
+- Reported performance is up to ~20× slower than native VT-x (guest
+  boot times measured in minutes, not seconds).
+- VirtualBox 7.2.4 has a known issue crashing Windows 11 guests at
+  startup when WHPX is active. Moving target.
+- A SOC lab with an attacker, SIEM, and scanner under sustained load
+  is exactly the workload where WHPX's overhead is worst felt.
+
+"Works technically" is not the same as "works for the lab". We keep
+the hard refuse and document the alternative for users who choose to
+accept the performance penalty manually by unsetting
+`SOCOOL_STRICT_HYPERV_CHECK` in a future release (not yet implemented).
+
 Therefore the failure message is explicit:
 
 > VirtualBox 7.x is installed, but Hyper-V is currently enabled. VirtualBox
@@ -94,13 +130,16 @@ Therefore the failure message is explicit:
 
 ### Apple Silicon
 
-VirtualBox ≥ 7.0 ships "developer preview" aarch64 macOS support, but it
-is not production-ready for the guest OSes we need (pfSense, Windows x86
-victim) as of the authoring date. We therefore route Apple Silicon to
-QEMU — specifically the open-source QEMU that `brew install qemu`
-provides — and optionally surface UTM as a GUI wrapper for users who
-prefer it. Running an x86_64 Windows victim on Apple Silicon requires
-x86 emulation, which is slow but functional for lab use.
+VirtualBox 7.1 added production macOS aarch64 host support and 7.2
+continues it. For SOCool specifically we still route Apple Silicon to
+QEMU as primary (see the table note above) because the lab's x86
+guests — pfSense and the Windows victim — would run under x86
+emulation regardless of hypervisor, and QEMU's TCG emulator is well
+understood, whereas VirtualBox 7.2.4's Windows-guest crash issue
+introduces a moving target. `brew install qemu` provides the
+open-source QEMU; UTM is surfaced as a GUI wrapper for users who
+prefer it. A user can override to VirtualBox via
+`SOCOOL_HYPERVISOR=virtualbox` and accept the caveats.
 
 ### Nested virtualisation
 
@@ -183,9 +222,13 @@ preflight check in `scripts/preflight/check-nested-virt.sh` verifies:
 ## References
 
 - VirtualBox manual: https://www.virtualbox.org/manual
-- VirtualBox Apple Silicon status (re-verify before each release):
+- VirtualBox 7.2 Apple Silicon announcement:
+  https://blogs.oracle.com/virtualization/oracle-virtualbox-72
+- VirtualBox downloads & current version:
   https://www.virtualbox.org/wiki/Downloads
 - libvirt / QEMU documentation: https://libvirt.org/docs.html
+- Microsoft — Virtualization apps and Hyper-V coexistence:
+  https://learn.microsoft.com/en-us/troubleshoot/windows-client/application-management/virtualization-apps-not-work-with-hyper-v
 - Microsoft Hyper-V + nested virtualisation:
   https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/user-guide/nested-virtualization
 - HashiCorp Vagrant providers:

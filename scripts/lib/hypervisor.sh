@@ -67,7 +67,13 @@ _validate_choice() {
         darwin:x86_64:virtualbox)  return 0 ;;
         darwin:x86_64:libvirt)     return 0 ;;
         darwin:aarch64:libvirt)    return 0 ;;
-        darwin:aarch64:virtualbox) die 30 "VirtualBox support on Apple Silicon is limited and not supported by SOCool. Use SOCOOL_HYPERVISOR=libvirt (runs QEMU under the hood on macOS)." ;;
+        darwin:aarch64:virtualbox)
+            # VirtualBox 7.1+ supports Apple Silicon hosts, so this is no longer
+            # a hard-fail. We still prefer libvirt/QEMU on aarch64 macOS — see
+            # docs/adr/0002-hypervisor-matrix.md — but the user may explicitly
+            # opt in with SOCOOL_HYPERVISOR=virtualbox.
+            log_warn "VirtualBox on Apple Silicon: pfSense and the Windows victim are x86_64 and will run under x86 emulation (slow). VirtualBox 7.2.4 has known Windows-guest crash bugs. QEMU is recommended (SOCOOL_HYPERVISOR=libvirt)."
+            return 0 ;;
         windows:*:*)               die 30 "setup.sh is not supported on Windows hosts -- use setup.ps1 from a PowerShell 7 prompt." ;;
         *) die 30 "unsupported host/hypervisor combination: os=$SOCOOL_OS arch=$SOCOOL_ARCH choice=$choice" ;;
     esac

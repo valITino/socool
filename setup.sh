@@ -41,7 +41,7 @@ Flags:
                              fast if any required env var is unset.
       --hypervisor <v>       virtualbox | libvirt. (SOCOOL_HYPERVISOR)
       --scanner <v>          nessus | openvas | none. (SOCOOL_SCANNER)
-      --windows-source <v>   msdev | iso. (SOCOOL_WINDOWS_SOURCE)
+      --windows-source <v>   eval | iso. (SOCOOL_WINDOWS_SOURCE)
       --windows-iso <path>   Absolute path to a Windows ISO, required
                              when --windows-source=iso. (SOCOOL_WINDOWS_ISO_PATH)
       --allow-bridged        Permit bridged networking. Off by default;
@@ -108,26 +108,28 @@ resolve_scanner_choice() {
 resolve_windows_source() {
     if [[ -n "${SOCOOL_WINDOWS_SOURCE:-}" ]]; then
         case "$SOCOOL_WINDOWS_SOURCE" in
-            msdev) log_info "windows-source: msdev (from env)"; return 0 ;;
+            eval) log_info "windows-source: eval (from env)"; return 0 ;;
             iso)
                 if [[ -z "${SOCOOL_WINDOWS_ISO_PATH:-}" ]]; then
                     die 2 "SOCOOL_WINDOWS_SOURCE=iso requires SOCOOL_WINDOWS_ISO_PATH"
                 fi
                 [[ -f "$SOCOOL_WINDOWS_ISO_PATH" ]] || die 2 "SOCOOL_WINDOWS_ISO_PATH does not exist: $SOCOOL_WINDOWS_ISO_PATH"
                 log_info "windows-source: iso ($SOCOOL_WINDOWS_ISO_PATH, from env)"; return 0 ;;
-            *) die 2 "invalid SOCOOL_WINDOWS_SOURCE='$SOCOOL_WINDOWS_SOURCE' (expected msdev or iso)" ;;
+            msdev)
+                die 2 "SOCOOL_WINDOWS_SOURCE=msdev is no longer supported: Microsoft's Windows dev VM page has been unavailable since October 2024. Use 'eval' (Evaluation Center ISO) or 'iso' (provide your own)." ;;
+            *) die 2 "invalid SOCOOL_WINDOWS_SOURCE='$SOCOOL_WINDOWS_SOURCE' (expected eval or iso)" ;;
         esac
     fi
     prompt_action \
         "Windows victim VM source" \
-        "SOCool can download the free Microsoft Windows dev eval VM, or build from a Windows ISO you provide." \
-        "https://developer.microsoft.com/en-us/windows/downloads/virtual-machines/" \
-        "msdev (auto-download) or iso (you provide a path)" \
+        "SOCool can download the free Windows 11 Enterprise evaluation ISO (90-day, no product key required) and run an unattended install, or build from a Windows ISO you provide." \
+        "https://www.microsoft.com/en-us/evalcenter/evaluate-windows-11-enterprise" \
+        "eval (auto-download evaluation ISO) or iso (you provide a path)" \
         "SOCOOL_WINDOWS_SOURCE"
     local chosen
-    chosen="$(prompt_with_default windows-source "Source" "msdev" "SOCOOL_WINDOWS_SOURCE")"
+    chosen="$(prompt_with_default windows-source "Source" "eval" "SOCOOL_WINDOWS_SOURCE")"
     case "$chosen" in
-        msdev) export SOCOOL_WINDOWS_SOURCE=msdev ;;
+        eval) export SOCOOL_WINDOWS_SOURCE=eval ;;
         iso)
             export SOCOOL_WINDOWS_SOURCE=iso
             prompt_action \

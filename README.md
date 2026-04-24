@@ -59,14 +59,16 @@ Actual per-VM sizing and the total live in [`config/lab.yml`](./config/lab.yml).
 | Host | Primary | Fallback | Hard-blocked by |
 |---|---|---|---|
 | Linux x86_64 | VirtualBox | QEMU/KVM | — |
-| Linux aarch64 | QEMU/KVM | — | VirtualBox (no aarch64) |
+| Linux aarch64 | QEMU/KVM | — | VirtualBox (no aarch64 Linux host) |
 | macOS Intel | VirtualBox | QEMU | — |
-| macOS Apple Silicon | QEMU / UTM | — | VirtualBox (limited on aarch64) |
+| macOS Apple Silicon | QEMU / UTM | VirtualBox 7.2+ (with caveats) | — |
 | Windows x86_64 | VirtualBox | — | Hyper-V / WSL2 / Docker Desktop |
 | Windows aarch64 | *unsupported* | — | — |
 
-See [ADR-0002](./docs/adr/0002-hypervisor-matrix.md) for the rationale and
-remediation paths.
+See [ADR-0002](./docs/adr/0002-hypervisor-matrix.md) for rationale,
+remediation paths, and the Apple Silicon caveats (VirtualBox 7.1+
+supports the host, but the lab's x86 guests run under slow x86
+emulation either way and 7.2.4 has a known Windows-guest crash).
 
 ## Lab topology
 

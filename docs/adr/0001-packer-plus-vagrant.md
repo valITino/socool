@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-04-24
+- **Last verified:** 2026-04-24 (Phase 1 web research)
 - **Deciders:** SOCool maintainers (authored via the `software-architect` and `documentation` skills)
 
 ## Context
@@ -70,10 +71,12 @@ Explicit division of responsibility:
 - Two tools to install, version-pin, and keep preflight checks for (see
   `scripts/preflight/`). This is acceptable — both are mature, both are
   packaged by the major OS package managers we target.
-- HashiCorp's licence change (BSL for Vagrant ≥ 2.4 and Packer ≥ 1.10 as
-  of mid-2023) is a supply-chain consideration. For our use case
-  (developer / CI internal tool) the BSL allows use; we flag this for
-  `devsecops` re-verification each release.
+- HashiCorp's licence change (BSL 1.1 for Vagrant ≥ 2.4 and Packer ≥
+  1.10 as of mid-2023) is a supply-chain consideration. IBM completed
+  its acquisition of HashiCorp in February 2025; the BSL terms were
+  not changed by the acquisition (re-verified 2026-04-24). For our
+  use case (developer / CI internal tool) the BSL allows use; we flag
+  this for `devsecops` re-verification each release.
 - A new contributor has to understand *both* the Packer and Vagrant
   mental models. Mitigated by the per-VM `README.md` in every
   `packer/<vm>/` directory and the runbooks in `docs/runbooks/`.

@@ -98,7 +98,10 @@ function script:Assert-SocoolHypervisorChoice {
         'darwin:x86_64:virtualbox'   { return }
         'darwin:x86_64:libvirt'      { return }
         'darwin:aarch64:libvirt'     { return }
-        'darwin:aarch64:virtualbox'  { Exit-Socool 30 'VirtualBox support on Apple Silicon is limited and not supported by SOCool. Use SOCOOL_HYPERVISOR=libvirt (QEMU under the hood on macOS).' }
+        'darwin:aarch64:virtualbox'  {
+            Write-SocoolWarn 'VirtualBox on Apple Silicon: pfSense and the Windows victim are x86_64 and will run under x86 emulation (slow). VirtualBox 7.2.4 has known Windows-guest crash bugs. QEMU is recommended (SOCOOL_HYPERVISOR=libvirt).'
+            return
+        }
         'windows:x86_64:virtualbox'  { return }
         'windows:x86_64:libvirt'     { Exit-Socool 30 'libvirt/QEMU on Windows is not supported by SOCool. Use VirtualBox.' }
         default                      { Exit-Socool 30 ("unsupported host/hypervisor combination: {0}" -f $key) }

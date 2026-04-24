@@ -171,7 +171,8 @@ ensure_packer() {
     _ensure_confirm "packer"
     case "$(detect_package_manager)" in
         apt|dnf)
-            die 21 "packer not found and SOCool does not auto-configure HashiCorp's third-party repo. Follow https://developer.hashicorp.com/packer/install and re-run." ;;
+            _hashicorp_repo_refusal_message "packer"
+            die 21 "packer not found" ;;
         pacman)
             die 21 "packer is not in Arch core/extra/community. Install via AUR (e.g., 'yay -S packer') and re-run." ;;
         brew)
@@ -185,13 +186,50 @@ ensure_vagrant() {
     _ensure_confirm "vagrant"
     case "$(detect_package_manager)" in
         apt|dnf)
-            die 21 "vagrant not found and SOCool does not auto-configure HashiCorp's third-party repo. Follow https://developer.hashicorp.com/vagrant/install and re-run." ;;
+            _hashicorp_repo_refusal_message "vagrant"
+            die 21 "vagrant not found" ;;
         pacman)
             _pkg_install_pacman vagrant ;;
         brew)
             brew tap hashicorp/tap
             _pkg_install_brew hashicorp/tap/hashicorp-vagrant ;;
     esac
+}
+
+# _hashicorp_repo_refusal_message <pkg> — prints the exact copy-paste
+# commands to add the HashiCorp apt/dnf repo, then exits. SOCool
+# does not auto-configure third-party package repositories: adding a
+# trusted signing key + sources.list entry is a per-host security
+# decision and we want the user's conscious consent each time. Verified
+# 2026-04-24.
+_hashicorp_repo_refusal_message() {
+    local pkg="$1" pm; pm="$(detect_package_manager)"
+    log_error ""
+    log_error "SOCool does not auto-configure HashiCorp's package repository"
+    log_error "because it requires adding a trusted GPG key and a new"
+    log_error "sources entry to your system — a decision only you should"
+    log_error "make. The official instructions are:"
+    log_error ""
+    case "$pm" in
+        apt)
+            log_error "  # Ubuntu / Debian"
+            log_error "  wget -O- https://apt.releases.hashicorp.com/gpg | \\"
+            log_error "      sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg"
+            log_error "  echo \"deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com \$(lsb_release -cs) main\" | \\"
+            log_error "      sudo tee /etc/apt/sources.list.d/hashicorp.list"
+            log_error "  sudo apt-get update && sudo apt-get install -y $pkg"
+            ;;
+        dnf)
+            log_error "  # Fedora / RHEL"
+            log_error "  sudo dnf install -y dnf-plugins-core"
+            log_error "  sudo dnf config-manager addrepo --from-repofile=https://rpm.releases.hashicorp.com/fedora/hashicorp.repo"
+            log_error "  sudo dnf install -y $pkg"
+            ;;
+    esac
+    log_error ""
+    log_error "Reference: https://developer.hashicorp.com/$pkg/install"
+    log_error ""
+    log_error "Re-run setup.sh after installing."
 }
 
 # ensure_hypervisor <virtualbox|libvirt>

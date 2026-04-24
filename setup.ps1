@@ -16,7 +16,7 @@ param(
     [Alias('y')][switch]$Yes,
     [ValidateSet('virtualbox','libvirt')] [string]$Hypervisor,
     [ValidateSet('nessus','openvas','none')] [string]$Scanner,
-    [ValidateSet('msdev','iso')] [string]$WindowsSource,
+    [ValidateSet('eval','iso')] [string]$WindowsSource,
     [string]$WindowsIso,
     [switch]$AllowBridged,
     [ValidateSet('debug','info','warn','error')] [string]$LogLevel
@@ -51,7 +51,7 @@ Flags:
                              fast if any required env var is unset.
   -Hypervisor <v>            virtualbox | libvirt. (SOCOOL_HYPERVISOR)
   -Scanner <v>               nessus | openvas | none. (SOCOOL_SCANNER)
-  -WindowsSource <v>         msdev | iso. (SOCOOL_WINDOWS_SOURCE)
+  -WindowsSource <v>         eval | iso. (SOCOOL_WINDOWS_SOURCE)
   -WindowsIso <path>         Absolute path to a Windows ISO, required
                              when -WindowsSource iso. (SOCOOL_WINDOWS_ISO_PATH)
   -AllowBridged              Permit bridged networking. Off by default;
@@ -106,7 +106,7 @@ function Resolve-ScannerChoice {
 function Resolve-WindowsSource {
     if (-not [string]::IsNullOrEmpty($env:SOCOOL_WINDOWS_SOURCE)) {
         switch ($env:SOCOOL_WINDOWS_SOURCE) {
-            'msdev' { Write-SocoolInfo 'windows-source: msdev (from env)'; return }
+            'eval'  { Write-SocoolInfo 'windows-source: eval (from env)'; return }
             'iso'   {
                 if ([string]::IsNullOrEmpty($env:SOCOOL_WINDOWS_ISO_PATH)) {
                     Exit-Socool 2 'SOCOOL_WINDOWS_SOURCE=iso requires SOCOOL_WINDOWS_ISO_PATH'
@@ -117,18 +117,19 @@ function Resolve-WindowsSource {
                 Write-SocoolInfo ("windows-source: iso ({0}, from env)" -f $env:SOCOOL_WINDOWS_ISO_PATH)
                 return
             }
-            default { Exit-Socool 2 ("invalid SOCOOL_WINDOWS_SOURCE='{0}' (expected msdev or iso)" -f $env:SOCOOL_WINDOWS_SOURCE) }
+            'msdev' { Exit-Socool 2 "SOCOOL_WINDOWS_SOURCE=msdev is no longer supported: Microsoft's Windows dev VM page has been unavailable since October 2024. Use 'eval' (Evaluation Center ISO) or 'iso' (provide your own)." }
+            default { Exit-Socool 2 ("invalid SOCOOL_WINDOWS_SOURCE='{0}' (expected eval or iso)" -f $env:SOCOOL_WINDOWS_SOURCE) }
         }
     }
     Show-SocoolAction `
         -Title   'Windows victim VM source' `
-        -What    'SOCool can download the free Microsoft Windows dev eval VM, or build from a Windows ISO you provide.' `
-        -Where   'https://developer.microsoft.com/en-us/windows/downloads/virtual-machines/' `
-        -Paste   'msdev (auto-download) or iso (you provide a path)' `
+        -What    'SOCool can download the free Windows 11 Enterprise evaluation ISO (90-day, no product key required) and run an unattended install, or build from a Windows ISO you provide.' `
+        -Where   'https://www.microsoft.com/en-us/evalcenter/evaluate-windows-11-enterprise' `
+        -Paste   'eval (auto-download evaluation ISO) or iso (you provide a path)' `
         -EnvName 'SOCOOL_WINDOWS_SOURCE'
-    $chosen = Read-SocoolPrompt -Label 'windows-source' -Question 'Source' -Default 'msdev' -EnvName 'SOCOOL_WINDOWS_SOURCE'
+    $chosen = Read-SocoolPrompt -Label 'windows-source' -Question 'Source' -Default 'eval' -EnvName 'SOCOOL_WINDOWS_SOURCE'
     switch ($chosen) {
-        'msdev' { $env:SOCOOL_WINDOWS_SOURCE = 'msdev' }
+        'eval'  { $env:SOCOOL_WINDOWS_SOURCE = 'eval' }
         'iso'   {
             $env:SOCOOL_WINDOWS_SOURCE = 'iso'
             Show-SocoolAction `
