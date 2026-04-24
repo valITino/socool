@@ -92,17 +92,39 @@ run_pipeline() {
                 packer_vars+=("-var=windows_iso_checksum=${SOCOOL_WINDOWS_ISO_CHECKSUM:-none}")
                 ;;
             nessus)
-                [[ -n "${SOCOOL_NESSUS_DEB_URL:-}"         ]] || die 40 "nessus build needs SOCOOL_NESSUS_DEB_URL. See packer/nessus/README.md."
-                [[ -n "${SOCOOL_NESSUS_ACTIVATION_CODE:-}" ]] || die 40 "nessus build needs SOCOOL_NESSUS_ACTIVATION_CODE."
-                packer_vars+=("-var=nessus_deb_url=$SOCOOL_NESSUS_DEB_URL")
-                packer_vars+=("-var=nessus_activation_code=$SOCOOL_NESSUS_ACTIVATION_CODE")
+                # CHANGE_ME_AT_RUNTIME is the .env.example sentinel;
+                # treat it as unset so the user gets an actionable
+                # error rather than a confusing Packer URL-parse
+                # failure 20 minutes into the build.
+                local nessus_deb="${SOCOOL_NESSUS_DEB_URL:-}"
+                local nessus_code="${SOCOOL_NESSUS_ACTIVATION_CODE:-}"
+                [[ "$nessus_deb"  == "CHANGE_ME_AT_RUNTIME" ]] && nessus_deb=""
+                [[ "$nessus_code" == "CHANGE_ME_AT_RUNTIME" ]] && nessus_code=""
+                [[ -n "$nessus_deb"  ]] || die 40 "nessus build needs SOCOOL_NESSUS_DEB_URL (Tenable download URL or file:// path). See packer/nessus/README.md."
+                [[ -n "$nessus_code" ]] || die 40 "nessus build needs SOCOOL_NESSUS_ACTIVATION_CODE (emailed by Tenable at sign-up)."
+                packer_vars+=("-var=nessus_deb_url=$nessus_deb")
+                packer_vars+=("-var=nessus_activation_code=$nessus_code")
                 ;;
         esac
 
-        # Argument array; no string concatenation.
-        ( cd -- "$repo_root/packer/$vm" && \
-          packer init -- "$template" && \
-          packer build -only="$packer_source" "${packer_vars[@]}" -- "$template" )
+        # Argument array; no string concatenation. Explicit exit-code
+        # translation: Packer's raw exit (1, 2, ...) becomes our
+        # documented 40 so docs/troubleshooting.md's code index is
+        # meaningful. Without the `|| rc=$?` dance, set -e would kill
+        # setup.sh with whatever Packer emitted, never reaching die 40.
+        local rc=0
+        (
+            cd -- "$repo_root/packer/$vm"
+            packer init -- "$template"
+        ) || rc=$?
+        [[ "$rc" == "0" ]] || die 40 "packer init failed for $vm (upstream exit $rc)"
+
+        rc=0
+        (
+            cd -- "$repo_root/packer/$vm"
+            packer build -only="$packer_source" "${packer_vars[@]}" -- "$template"
+        ) || rc=$?
+        [[ "$rc" == "0" ]] || die 40 "packer build failed for $vm (upstream exit $rc)"
         built=$((built+1))
     done < <(lab_vm_hostnames)
 
@@ -115,7 +137,12 @@ run_pipeline() {
         return 0
     fi
     banner "vagrant up"
-    ( cd -- "$repo_root/vagrant" && vagrant up --provider "$(_vagrant_provider_for "$hv")" )
+    local rc=0
+    (
+        cd -- "$repo_root/vagrant"
+        vagrant up --provider "$(_vagrant_provider_for "$hv")"
+    ) || rc=$?
+    [[ "$rc" == "0" ]] || die 50 "vagrant up failed (upstream exit $rc)"
 }
 
 # _vagrant_provider_for <hypervisor> — maps our hypervisor name to Vagrant's.

@@ -25,7 +25,10 @@
     <webgui>
       <protocol>https</protocol>
       <loginautocomplete></loginautocomplete>
-      <ssl-certref>socool-webgui-cert</ssl-certref>
+      <!-- No <ssl-certref> here: pfSense auto-generates a self-signed
+           webConfigurator certificate at first boot when the reference
+           is absent. Providing a dangling refid would trigger a
+           migration-time error and a fallback to HTTP. -->
       <port>443</port>
       <max_procs>2</max_procs>
       <!-- Bind the webConfigurator to the management interface only;
@@ -38,10 +41,15 @@
     </ssh>
     <user>
       <name>admin</name>
-      <!-- BUILD-ONLY bcrypt of 'pfsense' - rotated by
-           rotate-credentials.sh. If you see this hash in a shipped
-           box, the rotation step failed. -->
-      <password>$2y$10$BUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDO</password>
+      <!-- BUILD-ONLY bcrypt placeholder - rotated by
+           rotate-credentials.sh before packaging. The value is a
+           syntactically valid 60-char $2y$10$ string (7-char prefix +
+           22-char salt + 31-char hash) so pfSense's config loader
+           accepts it, but it is NOT a hash of any real password -
+           every login attempt fails until rotate-credentials writes a
+           real hash. If you see this placeholder in a shipped box,
+           the rotation step failed. -->
+      <password>$2y$10$BUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDONLYZZZZZZZZ</password>
       <descr>Administrator (BUILD-ONLY; rotated post-install)</descr>
       <scope>system</scope>
       <groupname>admins</groupname>

@@ -52,6 +52,21 @@ only. Build-only credentials rotated during provisioning.
 
 ## Known gotchas
 
+- **Netgate ships only `.iso.gz`, not `.iso`.** The publisher URL
+  pinned in the template (`pfSense-CE-2.7.2-RELEASE-amd64.iso.gz`)
+  downloads a gzipped image; no standalone `.iso` is available at
+  `atxfiles.netgate.com`. Packer does NOT auto-extract — the
+  hypervisor will fail to boot the gzipped file as-is. Until a
+  `local-exec` pre-step is added to the template, the operator
+  pre-extracts once:
+  ```
+  curl -fsSL -o /tmp/pfsense.iso.gz \
+      https://atxfiles.netgate.com/mirror/downloads/pfSense-CE-2.7.2-RELEASE-amd64.iso.gz
+  gunzip /tmp/pfsense.iso.gz
+  export SOCOOL_ISO_CACHE_DIR=/tmp
+  ```
+  then points `iso_url` at `file:///tmp/pfsense.iso`. Tracked as a
+  first-build-iteration tuning item.
 - **`boot_command` timing is the hardest part.** bsdinstall's menu
   flow has shifted between pfSense releases; the sequence in
   `template.pkr.hcl` matches 2.7.2 as tested against Netgate's

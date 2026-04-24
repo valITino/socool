@@ -7,10 +7,18 @@ variable "hypervisor" {
 }
 
 variable "output_dir"    { type = string }
-variable "iso_cache_dir" { type = string, default = "" }
-variable "box_version"   { type = string, default = "0.1.0" }
-variable "ubuntu_release" { type = string, default = "24.04.1" }
-
+variable "iso_cache_dir" {
+  type    = string
+  default = ""
+}
+variable "box_version" {
+  type    = string
+  default = "0.1.0"
+}
+variable "ubuntu_release" {
+  type    = string
+  default = "24.04.1"
+}
 variable "greenbone_compose_url" {
   type    = string
   # Greenbone Community Containers' published compose file. The URL
@@ -20,6 +28,15 @@ variable "greenbone_compose_url" {
   description = "Upstream docker-compose manifest for Greenbone Community Containers."
 }
 
-variable "cpus"    { type = number, default = 2 }
-variable "ram_mb"  { type = number, default = 4096 }
-variable "disk_gb" { type = number, default = 40 }
+variable "cpus" {
+  type    = number
+  default = 2
+}
+variable "ram_mb" {
+  type    = number
+  default = 4096
+}
+variable "disk_gb" {
+  type    = number
+  default = 40
+}

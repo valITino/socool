@@ -101,10 +101,14 @@ function Invoke-SocoolProvisionPipeline {
                 $packerVars += ("-var=windows_iso_checksum={0}" -f ($(if ($env:SOCOOL_WINDOWS_ISO_CHECKSUM) { $env:SOCOOL_WINDOWS_ISO_CHECKSUM } else { 'none' })))
             }
             'nessus' {
-                if ([string]::IsNullOrEmpty($env:SOCOOL_NESSUS_DEB_URL))         { Exit-Socool 40 'nessus build needs SOCOOL_NESSUS_DEB_URL. See packer/nessus/README.md.' }
-                if ([string]::IsNullOrEmpty($env:SOCOOL_NESSUS_ACTIVATION_CODE)) { Exit-Socool 40 'nessus build needs SOCOOL_NESSUS_ACTIVATION_CODE.' }
-                $packerVars += ("-var=nessus_deb_url={0}"         -f $env:SOCOOL_NESSUS_DEB_URL)
-                $packerVars += ("-var=nessus_activation_code={0}" -f $env:SOCOOL_NESSUS_ACTIVATION_CODE)
+                # CHANGE_ME_AT_RUNTIME is the .env.example sentinel;
+                # treat it as unset.
+                $nessusDeb  = if ($env:SOCOOL_NESSUS_DEB_URL         -and $env:SOCOOL_NESSUS_DEB_URL         -ne 'CHANGE_ME_AT_RUNTIME') { $env:SOCOOL_NESSUS_DEB_URL         } else { '' }
+                $nessusCode = if ($env:SOCOOL_NESSUS_ACTIVATION_CODE -and $env:SOCOOL_NESSUS_ACTIVATION_CODE -ne 'CHANGE_ME_AT_RUNTIME') { $env:SOCOOL_NESSUS_ACTIVATION_CODE } else { '' }
+                if ([string]::IsNullOrEmpty($nessusDeb))  { Exit-Socool 40 'nessus build needs SOCOOL_NESSUS_DEB_URL (Tenable download URL or file:// path). See packer/nessus/README.md.' }
+                if ([string]::IsNullOrEmpty($nessusCode)) { Exit-Socool 40 'nessus build needs SOCOOL_NESSUS_ACTIVATION_CODE (emailed by Tenable at sign-up).' }
+                $packerVars += ("-var=nessus_deb_url={0}"         -f $nessusDeb)
+                $packerVars += ("-var=nessus_activation_code={0}" -f $nessusCode)
             }
         }
 

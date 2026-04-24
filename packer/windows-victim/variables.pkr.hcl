@@ -7,9 +7,14 @@ variable "hypervisor" {
 }
 
 variable "output_dir"    { type = string }
-variable "iso_cache_dir" { type = string, default = "" }
-variable "box_version"   { type = string, default = "0.1.0" }
-
+variable "iso_cache_dir" {
+  type    = string
+  default = ""
+}
+variable "box_version" {
+  type    = string
+  default = "0.1.0"
+}
 # ─── Windows ISO: user-supplied ─────────────────────────────────────────
 # The Microsoft Evaluation Center URL is session-gated and rotates, so
 # we cannot pin one in the repo. The user provides either:
@@ -29,10 +34,18 @@ variable "windows_iso_checksum" {
 }
 
 # Windows VM (and the Evaluation Center image) is x86_64 only.
-variable "cpus"    { type = number, default = 2 }
-variable "ram_mb"  { type = number, default = 4096 }
-variable "disk_gb" { type = number, default = 60 }
-
+variable "cpus" {
+  type    = number
+  default = 2
+}
+variable "ram_mb" {
+  type    = number
+  default = 4096
+}
+variable "disk_gb" {
+  type    = number
+  default = 60
+}
 variable "wazuh_manager_ip" {
   type        = string
   default     = "10.42.20.10"

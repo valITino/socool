@@ -44,15 +44,17 @@ prompt has an environment-variable equivalent for non-interactive CI use; see
 
 ## Requirements
 
-| Resource | Minimum | Recommended |
-|---|---|---|
-| CPU | 4 physical cores with VT-x / AMD-V | 8 cores |
-| RAM | 20 GB free | 32 GB |
-| Disk | 250 GB free on the hypervisor's storage pool | 500 GB SSD |
-| Nested virt | required for scanner workloads | — |
-| Host OS | Linux (x86_64, aarch64), macOS (Intel, Apple Silicon), Windows 10/11 (x86_64) | Linux x86_64 |
+| Resource | Minimum (base lab, no scanner) | With scanner | Recommended |
+|---|---|---|---|
+| CPU | 4 physical cores with VT-x / AMD-V | 4 cores | 8 cores |
+| RAM free | 22 GB (17 GB VMs + 4 GB host headroom + margin) | 26 GB | 32 GB |
+| Disk free | 190 GB (168 GB VMs + 20 GB headroom) | 230 GB | 500 GB SSD |
+| Nested virt | — | required | — |
+| Host OS | Linux (x86_64, aarch64), macOS (Intel, Apple Silicon), Windows 10/11 (x86_64) | same | Linux x86_64 |
 
-Actual per-VM sizing and the total live in [`config/lab.yml`](./config/lab.yml).
+The minimum-RAM/disk figures are what `scripts/preflight/check-memory.sh`
+and `check-disk.sh` actually enforce. Actual per-VM sizing lives in
+[`config/lab.yml`](./config/lab.yml).
 
 ## Hypervisor matrix
 

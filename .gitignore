@@ -23,8 +23,11 @@ id_ed25519.*
 authorized_keys
 known_hosts
 
-# Rotated credentials emitted by Packer provisioners. Schema lives at
-# packer/<vm>/artifacts/credentials.json per config/lab.yml.
+# Packer per-VM artifacts dirs: rotated credentials (schema at
+# packer/<vm>/artifacts/credentials.json per config/lab.yml), Packer
+# build manifests, and anything else a provisioner drops there. The
+# whole directory is per-build state and must not be committed.
+packer/*/artifacts/
 **/artifacts/credentials.json
 **/artifacts/credentials/
 

@@ -7,9 +7,14 @@ variable "hypervisor" {
 }
 
 variable "output_dir"    { type = string }
-variable "iso_cache_dir" { type = string, default = "" }
-variable "box_version"   { type = string, default = "0.1.0" }
-
+variable "iso_cache_dir" {
+  type    = string
+  default = ""
+}
+variable "box_version" {
+  type    = string
+  default = "0.1.0"
+}
 variable "ubuntu_release" {
   type    = string
   default = "24.04.1"
@@ -22,6 +27,15 @@ variable "wazuh_version" {
   description = "Wazuh major.minor line; installer pulls latest 4.x.y."
 }
 
-variable "cpus"    { type = number, default = 4 }
-variable "ram_mb"  { type = number, default = 8192 }
-variable "disk_gb" { type = number, default = 60 }
+variable "cpus" {
+  type    = number
+  default = 4
+}
+variable "ram_mb" {
+  type    = number
+  default = 8192
+}
+variable "disk_gb" {
+  type    = number
+  default = 60
+}
