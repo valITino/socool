@@ -1,0 +1,139 @@
+<?xml version="1.0"?>
+<!--
+  packer/pfsense/http/config-seed.xml — initial pfSense configuration.
+
+  Seeded at install time via installerconfig and picked up by pfSense
+  on first boot. Sets up:
+    - Three interfaces (WAN / LAN / management) matching config/lab.yml
+    - Default-deny WAN rules + lan→wan-sim allow + management isolation
+    - webConfigurator bound to the management interface only
+    - SSH enabled for Packer / Vagrant provisioner access
+    - BUILD-ONLY admin password; rotated by scripts/rotate-credentials.sh
+
+  Reference: https://docs.netgate.com/pfsense/en/latest/config/xml-configuration-file.html
+-->
+<pfsense>
+  <version>21.7</version>
+  <lastchange>0</lastchange>
+  <system>
+    <optimization>normal</optimization>
+    <hostname>pfsense</hostname>
+    <domain>socool.local</domain>
+    <timezone>Etc/UTC</timezone>
+    <time-update-interval>300</time-update-interval>
+    <timeservers>pool.ntp.org</timeservers>
+    <webgui>
+      <protocol>https</protocol>
+      <loginautocomplete></loginautocomplete>
+      <ssl-certref>socool-webgui-cert</ssl-certref>
+      <port>443</port>
+      <max_procs>2</max_procs>
+      <!-- Bind the webConfigurator to the management interface only;
+           WAN / LAN are explicitly denied by the filter below. -->
+    </webgui>
+    <disablenatreflection>yes</disablenatreflection>
+    <ssh>
+      <enable>enabled</enable>
+      <port>22</port>
+    </ssh>
+    <user>
+      <name>admin</name>
+      <!-- BUILD-ONLY bcrypt of 'pfsense' - rotated by
+           rotate-credentials.sh. If you see this hash in a shipped
+           box, the rotation step failed. -->
+      <password>$2y$10$BUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDO</password>
+      <descr>Administrator (BUILD-ONLY; rotated post-install)</descr>
+      <scope>system</scope>
+      <groupname>admins</groupname>
+      <uid>0</uid>
+      <priv>user-shell-access</priv>
+    </user>
+    <group>
+      <name>admins</name>
+      <description>System Administrators</description>
+      <scope>system</scope>
+      <gid>1999</gid>
+      <member>0</member>
+      <priv>page-all</priv>
+    </group>
+  </system>
+
+  <interfaces>
+    <wan>
+      <if>vtnet0</if>
+      <descr>wan-sim</descr>
+      <enable>1</enable>
+      <ipaddr>dhcp</ipaddr>
+      <blockpriv>1</blockpriv>
+      <blockbogons>1</blockbogons>
+    </wan>
+    <lan>
+      <if>vtnet1</if>
+      <descr>lan</descr>
+      <enable>1</enable>
+      <ipaddr>10.42.10.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+    <opt1>
+      <if>vtnet2</if>
+      <descr>management</descr>
+      <enable>1</enable>
+      <ipaddr>10.42.20.1</ipaddr>
+      <subnet>24</subnet>
+    </opt1>
+  </interfaces>
+
+  <dhcpd>
+    <lan>
+      <enable></enable>
+      <range>
+        <from>10.42.10.100</from>
+        <to>10.42.10.199</to>
+      </range>
+    </lan>
+    <opt1>
+      <enable></enable>
+      <range>
+        <from>10.42.20.100</from>
+        <to>10.42.20.199</to>
+      </range>
+    </opt1>
+  </dhcpd>
+
+  <filter>
+    <!-- WAN: default deny (block everything from the simulated internet). -->
+    <!-- LAN: allow to wan-sim; deny to management. -->
+    <rule>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <descr>Allow LAN -> any (becomes wan-sim after management deny below)</descr>
+      <source><network>lan</network></source>
+      <destination><any></any></destination>
+    </rule>
+    <rule>
+      <type>block</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <descr>Deny LAN -> management</descr>
+      <source><network>lan</network></source>
+      <destination><network>opt1</network></destination>
+    </rule>
+    <!-- Management: isolated; allowed out to lan for agent pull, and
+         out to wan-sim only for package updates. -->
+    <rule>
+      <type>pass</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <descr>Allow management egress (SIEM needs updates + agents)</descr>
+      <source><network>opt1</network></source>
+      <destination><any></any></destination>
+    </rule>
+  </filter>
+
+  <nat>
+    <outbound>
+      <mode>automatic</mode>
+    </outbound>
+  </nat>
+</pfsense>

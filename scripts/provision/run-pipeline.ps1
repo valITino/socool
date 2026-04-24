@@ -73,15 +73,46 @@ function Invoke-SocoolProvisionPipeline {
         }
 
         Write-SocoolBanner ("Packer build: {0}" -f $vm)
+
+        $packerSource = switch ($Hypervisor) {
+            'virtualbox' { ("socool-{0}.virtualbox-iso.vm" -f $vm) }
+            'libvirt'    { ("socool-{0}.qemu.vm"           -f $vm) }
+            default      { Exit-Socool 1 ("unknown hypervisor: {0}" -f $Hypervisor) }
+        }
+
+        $isoCache = if ([string]::IsNullOrEmpty($env:SOCOOL_ISO_CACHE_DIR)) { Join-Path $repoRoot '.socool-cache/iso' } else { $env:SOCOOL_ISO_CACHE_DIR }
+
+        $packerVars = @(
+            ("-var=hypervisor={0}"     -f $Hypervisor),
+            ("-var=output_dir={0}"     -f $outputDir),
+            ("-var=iso_cache_dir={0}"  -f $isoCache)
+        )
+
+        switch ($vm) {
+            'windows-victim' {
+                $winUrl = $env:SOCOOL_WINDOWS_ISO_URL
+                if ($WindowsSource -eq 'iso' -and -not [string]::IsNullOrEmpty($env:SOCOOL_WINDOWS_ISO_PATH)) {
+                    $winUrl = "file://{0}" -f $env:SOCOOL_WINDOWS_ISO_PATH
+                }
+                if ([string]::IsNullOrEmpty($winUrl)) {
+                    Exit-Socool 40 'windows-victim build needs SOCOOL_WINDOWS_ISO_URL (for eval) or SOCOOL_WINDOWS_ISO_PATH (for iso). See packer/windows-victim/README.md.'
+                }
+                $packerVars += ("-var=windows_iso_url={0}"      -f $winUrl)
+                $packerVars += ("-var=windows_iso_checksum={0}" -f ($(if ($env:SOCOOL_WINDOWS_ISO_CHECKSUM) { $env:SOCOOL_WINDOWS_ISO_CHECKSUM } else { 'none' })))
+            }
+            'nessus' {
+                if ([string]::IsNullOrEmpty($env:SOCOOL_NESSUS_DEB_URL))         { Exit-Socool 40 'nessus build needs SOCOOL_NESSUS_DEB_URL. See packer/nessus/README.md.' }
+                if ([string]::IsNullOrEmpty($env:SOCOOL_NESSUS_ACTIVATION_CODE)) { Exit-Socool 40 'nessus build needs SOCOOL_NESSUS_ACTIVATION_CODE.' }
+                $packerVars += ("-var=nessus_deb_url={0}"         -f $env:SOCOOL_NESSUS_DEB_URL)
+                $packerVars += ("-var=nessus_activation_code={0}" -f $env:SOCOOL_NESSUS_ACTIVATION_CODE)
+            }
+        }
+
         Push-Location -LiteralPath (Join-Path $repoRoot "packer/$vm")
         try {
             & packer init -- $template
             if ($LASTEXITCODE -ne 0) { Exit-Socool 40 ("packer init failed for {0}" -f $vm) }
-            & packer build `
-                ("-var=hypervisor={0}" -f $Hypervisor) `
-                ("-var=windows_source={0}" -f $WindowsSource) `
-                ("-var=output_dir={0}" -f $outputDir) `
-                -- $template
+            & packer build ("-only={0}" -f $packerSource) $packerVars -- $template
             if ($LASTEXITCODE -ne 0) { Exit-Socool 40 ("packer build failed for {0}" -f $vm) }
             $built++
         } finally {

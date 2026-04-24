@@ -57,14 +57,52 @@ run_pipeline() {
 
         banner "Packer build: $vm"
         log_info "packer build $template -> $box_file"
+
+        # Per-hypervisor source name: the Packer templates declare
+        # 'source "virtualbox-iso" "vm"' and 'source "qemu" "vm"';
+        # -only = "<build_name>.<source_type>.vm".
+        local packer_source
+        case "$hv" in
+            virtualbox) packer_source="socool-${vm}.virtualbox-iso.vm" ;;
+            libvirt)    packer_source="socool-${vm}.qemu.vm" ;;
+            *)          die 1 "unknown hypervisor: $hv" ;;
+        esac
+
+        # Common variables every template accepts.
+        local -a packer_vars=(
+            "-var=hypervisor=$hv"
+            "-var=output_dir=$output_dir"
+            "-var=iso_cache_dir=${SOCOOL_ISO_CACHE_DIR:-$repo_root/.socool-cache/iso}"
+        )
+
+        # Per-VM extras.
+        case "$vm" in
+            windows-victim)
+                # Resolve the Windows ISO URL: either a user-supplied
+                # URL (eval source) or a file:// path from the local
+                # ISO path.
+                local win_url="${SOCOOL_WINDOWS_ISO_URL:-}"
+                if [[ "$winsrc" == "iso" && -n "${SOCOOL_WINDOWS_ISO_PATH:-}" ]]; then
+                    win_url="file://${SOCOOL_WINDOWS_ISO_PATH}"
+                fi
+                if [[ -z "$win_url" ]]; then
+                    die 40 "windows-victim build needs SOCOOL_WINDOWS_ISO_URL (for eval) or SOCOOL_WINDOWS_ISO_PATH (for iso). See packer/windows-victim/README.md."
+                fi
+                packer_vars+=("-var=windows_iso_url=$win_url")
+                packer_vars+=("-var=windows_iso_checksum=${SOCOOL_WINDOWS_ISO_CHECKSUM:-none}")
+                ;;
+            nessus)
+                [[ -n "${SOCOOL_NESSUS_DEB_URL:-}"         ]] || die 40 "nessus build needs SOCOOL_NESSUS_DEB_URL. See packer/nessus/README.md."
+                [[ -n "${SOCOOL_NESSUS_ACTIVATION_CODE:-}" ]] || die 40 "nessus build needs SOCOOL_NESSUS_ACTIVATION_CODE."
+                packer_vars+=("-var=nessus_deb_url=$SOCOOL_NESSUS_DEB_URL")
+                packer_vars+=("-var=nessus_activation_code=$SOCOOL_NESSUS_ACTIVATION_CODE")
+                ;;
+        esac
+
         # Argument array; no string concatenation.
         ( cd -- "$repo_root/packer/$vm" && \
           packer init -- "$template" && \
-          packer build \
-              -var="hypervisor=$hv" \
-              -var="windows_source=$winsrc" \
-              -var="output_dir=$output_dir" \
-              -- "$template" )
+          packer build -only="$packer_source" "${packer_vars[@]}" -- "$template" )
         built=$((built+1))
     done < <(lab_vm_hostnames)
 
