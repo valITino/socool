@@ -1,0 +1,173 @@
+# config/lab.yml — SOCool single source of truth
+#
+# This file is authoritative for hostnames, IP addresses, network CIDRs, VM
+# sizing, and the credentials-rotation policy. Never hardcode these values
+# anywhere else in the repo. Packer templates, the Vagrantfile, preflight
+# scripts, and the setup scripts all read from here.
+#
+# Schema: v1. Changes to the schema shape (not just values) require:
+#   1. A version bump below, and
+#   2. A new ADR under docs/adr/ explaining the migration.
+# See .skills/software-architect/SKILL.md for the schema definition.
+#
+# ──────────────────────────────────────────────────────────────────────────
+# Field reference
+# ──────────────────────────────────────────────────────────────────────────
+# version: integer. Current schema version.
+#
+# network:
+#   <role>:
+#     cidr:        RFC1918 or RFC2544 block; host-only / internal only.
+#     description: one-line human description.
+#
+# credentials_policy:
+#   rotation:
+#     required:     bool. If true, every VM with a documented default
+#                   credential must rotate it during provisioning.
+#     min_length:   int. Minimum length of a rotated credential.
+#     generator:    'csprng' (mandatory; $RANDOM / Get-Random banned).
+#   surface:
+#     location:     where rotated credentials are written inside the repo
+#                   tree (must be gitignored).
+#     display_to_user_at: 'final_summary_only' — setup.sh / setup.ps1 show
+#                   credentials only at the end, never mid-run.
+#   signing_keys:
+#     <publisher>:  pinned GPG/RSA key fingerprint for checksum signatures.
+#                   Empty at v1; populated as Packer templates land.
+#
+# vms: list of VM entries, each:
+#   hostname:      DNS-safe, lowercase, matches ^[a-z][a-z0-9-]{0,30}$
+#   role:          one of: firewall, attacker, victim, siem, scanner
+#   box:           Packer output box name, 'socool-<vm>-<version>'
+#   network_role:  one of: wan, lan, management, multi
+#                  ('multi' = VM has NICs on 2+ networks; see 'interfaces')
+#   interfaces:    list of {network, ip}. Required for multi-homed VMs
+#                  (pfSense). Optional for single-network VMs — if omitted,
+#                  a single interface is implied on the network matching
+#                  network_role with ip = the top-level 'ip' field.
+#   ip:            single-interface VMs only. Must be in the CIDR of the
+#                  network named by network_role.
+#   ram_mb, cpus, disk_gb: integers.
+#   boot_order:    integer, ascending. pfSense must be 0.
+#   depends_on:    optional list of hostnames that must be up first.
+#   optional:      bool. If true, user may skip this VM via prompt/flag.
+#
+# ──────────────────────────────────────────────────────────────────────────
+
+version: 1
+
+network:
+  wan_sim:
+    cidr: 198.18.0.0/24
+    description: >-
+      Simulated Internet-facing segment. Uses RFC 2544 benchmark range
+      (non-routable on the public Internet) to avoid any chance of accidental
+      real-world traffic. pfSense WAN lives here.
+  lan:
+    cidr: 10.42.10.0/24
+    description: >-
+      Attacker + victim subnet. Unusual RFC1918 range chosen to minimise
+      collision with common home/office LANs (192.168.x, 10.0.0.x).
+  management:
+    cidr: 10.42.20.0/24
+    description: >-
+      Out-of-band management for SIEM and scanner. Isolated from lan by
+      default pfSense policy.
+
+credentials_policy:
+  rotation:
+    required: true
+    min_length: 20
+    generator: csprng
+  surface:
+    # Relative to repo root. Gitignored. Emitted by Packer provisioners,
+    # read by setup.sh / setup.ps1 at final-summary time.
+    location: packer/<vm>/artifacts/credentials.json
+    display_to_user_at: final_summary_only
+  signing_keys:
+    # Populated as each Packer template lands. Empty at v1.
+    # Example (not yet active):
+    # wazuh: "0123 4567 89AB CDEF 0123  4567 89AB CDEF 0123 4567"
+    {}
+
+vms:
+  - hostname: pfsense
+    role: firewall
+    box: socool-pfsense-0.1.0
+    network_role: multi
+    interfaces:
+      - network: wan_sim
+        ip: 198.18.0.1
+      - network: lan
+        ip: 10.42.10.1
+      - network: management
+        ip: 10.42.20.1
+    ram_mb: 1024
+    cpus: 1
+    disk_gb: 8
+    boot_order: 0
+    optional: false
+
+  - hostname: kali
+    role: attacker
+    box: socool-kali-0.1.0
+    network_role: lan
+    ip: 10.42.10.10
+    ram_mb: 4096
+    cpus: 2
+    disk_gb: 40
+    boot_order: 10
+    depends_on: [pfsense]
+    optional: false
+
+  - hostname: windows-victim
+    role: victim
+    box: socool-windows-victim-0.1.0
+    network_role: lan
+    ip: 10.42.10.20
+    ram_mb: 4096
+    cpus: 2
+    disk_gb: 60
+    boot_order: 20
+    depends_on: [pfsense]
+    optional: false
+
+  - hostname: wazuh
+    role: siem
+    box: socool-wazuh-0.1.0
+    network_role: management
+    ip: 10.42.20.10
+    ram_mb: 8192
+    cpus: 4
+    disk_gb: 60
+    boot_order: 30
+    depends_on: [pfsense]
+    optional: false
+
+  # Scanner VMs are optional and mutually exclusive at runtime — the user
+  # picks one (or skips both) via SOCOOL_SCANNER={nessus|openvas|none} or
+  # the interactive prompt. Both entries are defined so the schema is
+  # exhaustive; setup.* filters to the selected one.
+  - hostname: nessus
+    role: scanner
+    box: socool-nessus-0.1.0
+    network_role: management
+    ip: 10.42.20.20
+    ram_mb: 4096
+    cpus: 2
+    disk_gb: 40
+    boot_order: 40
+    depends_on: [pfsense]
+    optional: true
+
+  - hostname: openvas
+    role: scanner
+    box: socool-openvas-0.1.0
+    network_role: management
+    ip: 10.42.20.20
+    ram_mb: 4096
+    cpus: 2
+    disk_gb: 40
+    boot_order: 40
+    depends_on: [pfsense]
+    optional: true

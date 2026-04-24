@@ -1,0 +1,89 @@
+# SOCool .gitignore
+#
+# Categories below are enforced by the `devsecops` skill. Nothing that could
+# plausibly contain a secret, a large binary, or host-specific state is
+# allowed to enter the repo.
+
+# ─── Secrets and user-local config ──────────────────────────────────────
+.env
+.env.local
+.env.*.local
+# `.env.example` is intentionally NOT ignored — it must stay tracked as a
+# template, but with placeholder values only.
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.keystore
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+authorized_keys
+known_hosts
+
+# Rotated credentials emitted by Packer provisioners. Schema lives at
+# packer/<vm>/artifacts/credentials.json per config/lab.yml.
+**/artifacts/credentials.json
+**/artifacts/credentials/
+
+# ─── Build artefacts ────────────────────────────────────────────────────
+# Vagrant boxes (output of every Packer build). Large, regenerable.
+*.box
+# Packer cache (ISOs, intermediate VMs).
+packer_cache/
+**/packer_cache/
+# Packer run artefacts.
+*.pkr.hcl.backup
+crash.log
+# HCL variable files that MAY contain secrets — explicit opt-in per-file
+# via `!packer/<vm>/example.auto.pkrvars.hcl` if we decide to track them.
+*.auto.pkrvars.hcl
+*.pkrvars.hcl
+
+# ─── Hypervisor and Vagrant runtime ─────────────────────────────────────
+.vagrant/
+**/.vagrant/
+# VirtualBox and libvirt local state (if any accidentally lands in-tree).
+*.vbox
+*.vbox-prev
+*.vdi
+*.vmdk
+*.qcow2
+*.img
+*.iso
+# Downloaded ISOs (we cache them under .socool-cache/).
+.socool-cache/
+
+# ─── OS and editor noise ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# ─── Language toolchains (if/when added) ────────────────────────────────
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# Ruby (Vagrantfile Gemfile.lock if we add one locally)
+.bundle/
+vendor/bundle/
+# Node (only if docs tooling needs it)
+node_modules/
+
+# ─── Logs and scratch ───────────────────────────────────────────────────
+*.log
+logs/
+scratch/
+tmp/
