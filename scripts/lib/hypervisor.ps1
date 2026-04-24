@@ -31,43 +31,9 @@ function script:Test-QemuAvailable {
                   (Get-Command qemu-system-aarch64 -ErrorAction SilentlyContinue))
 }
 
-# Windows-only: detect conflicts that make VirtualBox unreliable.
-# Returns a list of conflict names; empty list means no conflict.
-function script:Get-WindowsHypervisorConflicts {
-    if (-not $IsWindows) { return @() }
-    $conflicts = @()
-
-    # Hyper-V feature state.
-    try {
-        $hv = Get-WindowsOptionalFeature -Online -FeatureName 'Microsoft-Hyper-V-All' -ErrorAction SilentlyContinue
-        if ($null -ne $hv -and $hv.State -eq 'Enabled') { $conflicts += 'Hyper-V' }
-    } catch {
-        Write-SocoolDebug ("Hyper-V feature probe failed: {0}" -f $_.Exception.Message)
-    }
-
-    # bcdedit hypervisorlaunchtype. Even with the feature present,
-    # `off` means Hyper-V is dormant and VirtualBox can run.
-    try {
-        $bcd = & bcdedit /enum '{current}' 2>$null | Select-String 'hypervisorlaunchtype'
-        if ($bcd -and ($bcd -match 'Auto')) { $conflicts += 'hypervisorlaunchtype=Auto' }
-    } catch {
-        Write-SocoolDebug ("bcdedit probe failed: {0}" -f $_.Exception.Message)
-    }
-
-    # WSL2 backed by Hyper-V.
-    try {
-        $wslVer = & wsl.exe --version 2>$null
-        if ($LASTEXITCODE -eq 0 -and $wslVer) { $conflicts += 'WSL2' }
-    } catch {
-        Write-SocoolDebug ("wsl --version probe failed: {0}" -f $_.Exception.Message)
-    }
-
-    # Docker Desktop with WSL2 backend.
-    $dockerDesktopExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
-    if (Test-Path -LiteralPath $dockerDesktopExe) { $conflicts += 'Docker Desktop' }
-
-    return ,$conflicts
-}
+# Windows-only hypervisor-conflict probe lives in common.ps1 as
+# Test-SocoolWindowsHypervisorConflict so both this resolver and the
+# preflight check can share one implementation.
 
 # ────────────────────────────────────────────────────────────────────────
 # Matrix-driven resolution
@@ -120,7 +86,7 @@ function Resolve-SocoolHypervisor {
         }
         Assert-SocoolHypervisorChoice -Choice $explicit
         if ($IsWindows -and $explicit -eq 'virtualbox') {
-            $conflicts = Get-WindowsHypervisorConflicts
+            $conflicts = Test-SocoolWindowsHypervisorConflict
             if ($conflicts.Count -gt 0) {
                 Exit-Socool 30 ("VirtualBox is chosen but Windows reports conflicts: {0}. See docs/adr/0002-hypervisor-matrix.md for remediation." -f ($conflicts -join ', '))
             }
@@ -136,7 +102,7 @@ function Resolve-SocoolHypervisor {
 
     # 3. Windows: hard-block on Hyper-V / WSL2 / Docker Desktop BEFORE picking.
     if ($IsWindows) {
-        $conflicts = Get-WindowsHypervisorConflicts
+        $conflicts = Test-SocoolWindowsHypervisorConflict
         if ($conflicts.Count -gt 0) {
             $msg = @(
                 ("VirtualBox on Windows conflicts with: {0}." -f ($conflicts -join ', ')),

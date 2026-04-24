@@ -252,3 +252,48 @@ function Assert-SocoolHostnameToken {
         Exit-Socool 1 ("invalid hostname token: '{0}' (must match ^[a-z][a-z0-9-]{{0,30}}$)" -f $Value)
     }
 }
+
+# ────────────────────────────────────────────────────────────────────────
+# Windows-only hypervisor-conflict probe. Shared by hypervisor.ps1
+# (runtime resolution) and scripts/preflight/checks/check-hypervisor-
+# conflict.ps1 (preflight enforcement). Returns a list of conflict
+# names; empty list means no conflict.
+# ────────────────────────────────────────────────────────────────────────
+
+function Test-SocoolWindowsHypervisorConflict {
+    [CmdletBinding()]
+    param()
+    if (-not $IsWindows) { return @() }
+    $conflicts = @()
+
+    # Hyper-V feature state.
+    try {
+        $hv = Get-WindowsOptionalFeature -Online -FeatureName 'Microsoft-Hyper-V-All' -ErrorAction SilentlyContinue
+        if ($null -ne $hv -and $hv.State -eq 'Enabled') { $conflicts += 'Hyper-V' }
+    } catch {
+        Write-SocoolDebug ("Hyper-V feature probe failed: {0}" -f $_.Exception.Message)
+    }
+
+    # bcdedit hypervisorlaunchtype. Even with the feature present,
+    # `off` means Hyper-V is dormant and VirtualBox can run.
+    try {
+        $bcd = & bcdedit /enum '{current}' 2>$null | Select-String 'hypervisorlaunchtype'
+        if ($bcd -and ($bcd -match 'Auto')) { $conflicts += 'hypervisorlaunchtype=Auto' }
+    } catch {
+        Write-SocoolDebug ("bcdedit probe failed: {0}" -f $_.Exception.Message)
+    }
+
+    # WSL2 backed by Hyper-V.
+    try {
+        $wslVer = & wsl.exe --version 2>$null
+        if ($LASTEXITCODE -eq 0 -and $wslVer) { $conflicts += 'WSL2' }
+    } catch {
+        Write-SocoolDebug ("wsl --version probe failed: {0}" -f $_.Exception.Message)
+    }
+
+    # Docker Desktop (WSL2 backend by default on modern installs).
+    $dockerDesktopExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+    if (Test-Path -LiteralPath $dockerDesktopExe) { $conflicts += 'Docker Desktop' }
+
+    return ,$conflicts
+}

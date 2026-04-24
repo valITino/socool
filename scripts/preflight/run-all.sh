@@ -42,8 +42,13 @@ failed=()
 for check in "${checks[@]}"; do
     name="$(basename -- "$check" .sh)"
     log_debug "preflight: $name"
-    if ! bash -- "$check"; then
-        rc=$?
+    # Capture the check's real exit code. Using `|| rc=$?` rather than
+    # `if ! bash ...; then ... fi` because inside the `then` block of
+    # that pattern $? is always 0 (the negation's result), which would
+    # hide the check's actual documented exit code.
+    rc=0
+    bash -- "$check" || rc=$?
+    if (( rc != 0 )); then
         failed+=("$name ($rc)")
     fi
 done

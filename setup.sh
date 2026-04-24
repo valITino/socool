@@ -10,6 +10,25 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# ────────────────────────────────────────────────────────────────────────
+# Bash 4+ gate. This block runs BEFORE sourcing any lib so it works on
+# macOS hosts where /bin/bash is still 3.2 (GPLv2 constraint). If the
+# user runs via a modern bash (Homebrew's /opt/homebrew/bin/bash or
+# /usr/local/bin/bash) the check passes silently.
+# ────────────────────────────────────────────────────────────────────────
+if (( BASH_VERSINFO[0] < 4 )); then
+    printf 'setup.sh requires bash >= 4.0; detected %s at %s\n' \
+        "${BASH_VERSION:-unknown}" "$BASH" >&2
+    printf '\n' >&2
+    printf 'On macOS, /bin/bash is pinned at 3.2 for licensing reasons.\n' >&2
+    printf 'Install a modern bash via Homebrew and re-run under it:\n' >&2
+    printf '\n' >&2
+    printf '  brew install bash\n' >&2
+    printf '  /opt/homebrew/bin/bash ./setup.sh     # Apple Silicon\n' >&2
+    printf '  /usr/local/bin/bash  ./setup.sh       # Intel\n' >&2
+    exit 17
+fi
+
 # Internal bash locals — intentionally NOT in the user-facing SOCOOL_*
 # namespace (parity test enforces this).
 socool_version="0.1.0-dev"
