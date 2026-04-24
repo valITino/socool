@@ -26,7 +26,8 @@ case "$SOCOOL_OS" in
             die 12 "/proc/cpuinfo is not readable; cannot verify CPU virtualization. Run on a Linux host with a standard proc mount."
         fi
         if grep -Eq '(^|[[:space:]])(vmx|svm)([[:space:]]|$)' /proc/cpuinfo; then
-            local flag
+            # Not `local`: we're in a case arm at script top-level, not
+            # inside a function, so `local` would be a runtime error.
             flag="$(grep -Eo '(vmx|svm)' /proc/cpuinfo | sort -u | tr '\n' ',' | sed 's/,$//')"
             log_info "cpu-virt: enabled ($flag)"
             exit 0
@@ -34,7 +35,6 @@ case "$SOCOOL_OS" in
         die 12 "CPU virtualization (VT-x/AMD-V) is not enabled; enable Intel VT-x or AMD-V in your BIOS/UEFI firmware and reboot."
         ;;
     darwin)
-        local out
         out="$(sysctl -n kern.hv_support 2>/dev/null || printf '0')"
         if [[ "$out" == "1" ]]; then
             log_info "cpu-virt: enabled (kern.hv_support=1)"

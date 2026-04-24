@@ -41,7 +41,8 @@ case "$SOCOOL_OS" in
         fi
         ;;
     darwin)
-        local page_size free_pages
+        # Not `local`: we're in a case arm at script top-level, not
+        # inside a function, so `local` would be a runtime error.
         page_size="$(sysctl -n hw.pagesize 2>/dev/null || printf '4096')"
         free_pages="$(vm_stat 2>/dev/null | awk '/^Pages free:/ { gsub(/\./,""); print $3 }')"
         if [[ -n "${free_pages:-}" ]]; then
