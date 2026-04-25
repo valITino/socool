@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# scripts/provision/run-pipeline.sh — per-VM Packer build + `vagrant up`.
+#
+# Step 3 ships a dispatcher that iterates VMs from config/lab.yml in
+# boot_order and calls:
+#   packer build <packer/<vm>/template.pkr.hcl>
+#   (after all builds) vagrant up (from vagrant/Vagrantfile)
+# Packer templates and the Vagrantfile land in Steps 5 and 6; this file
+# detects their absence and reports clearly.
+
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+
+# run_pipeline <hypervisor> <scanner-choice> <windows-source>
+run_pipeline() {
+    local hv="${1:?hypervisor arg required}"
+    local scanner="${2:?scanner arg required}"
+    local winsrc="${3:?windows-source arg required}"
+
+    log_info "provision pipeline: hv=$hv scanner=$scanner windows=$winsrc"
+
+    local repo_root="$socool_repo_root"
+    local built=0 skipped=0 missing=0
+
+    while IFS= read -r vm; do
+        [[ -z "$vm" ]] && continue
+        validate_hostname_token "$vm"
+
+        # Filter: scanner choice gates nessus/openvas.
+        case "$vm" in
+            nessus)  [[ "$scanner" != "nessus"  ]] && { log_info "skip vm=$vm (scanner=$scanner)"; skipped=$((skipped+1)); continue; } ;;
+            openvas) [[ "$scanner" != "openvas" ]] && { log_info "skip vm=$vm (scanner=$scanner)"; skipped=$((skipped+1)); continue; } ;;
+        esac
+
+        local template="$repo_root/packer/$vm/template.pkr.hcl"
+        local box_name
+        box_name="$(lab_config_get "vms.$(_lab_vm_index "$vm").box")"
+        local output_dir="${SOCOOL_BOX_OUTPUT_DIR:-$repo_root/.socool-cache/boxes}"
+        mkdir -p -- "$output_dir"
+        local box_file="$output_dir/$box_name.box"
+
+        if [[ ! -f "$template" ]]; then
+            log_warn "packer template missing: $template (Step 5 pending for vm=$vm)"
+            missing=$((missing+1))
+            continue
+        fi
+
+        if [[ -f "$box_file" ]]; then
+            log_info "box already built, skipping: $box_file"
+            skipped=$((skipped+1))
+            continue
+        fi
+
+        banner "Packer build: $vm"
+        log_info "packer build $template -> $box_file"
+
+        # Per-hypervisor source name: the Packer templates declare
+        # 'source "virtualbox-iso" "vm"' and 'source "qemu" "vm"';
+        # -only = "<build_name>.<source_type>.vm".
+        local packer_source
+        case "$hv" in
+            virtualbox) packer_source="socool-${vm}.virtualbox-iso.vm" ;;
+            libvirt)    packer_source="socool-${vm}.qemu.vm" ;;
+            *)          die 1 "unknown hypervisor: $hv" ;;
+        esac
+
+        # Common variables every template accepts.
+        local -a packer_vars=(
+            "-var=hypervisor=$hv"
+            "-var=output_dir=$output_dir"
+            "-var=iso_cache_dir=${SOCOOL_ISO_CACHE_DIR:-$repo_root/.socool-cache/iso}"
+        )
+
+        # Per-VM extras.
+        case "$vm" in
+            windows-victim)
+                # Resolve the Windows ISO URL: either a user-supplied
+                # URL (eval source) or a file:// path from the local
+                # ISO path.
+                local win_url="${SOCOOL_WINDOWS_ISO_URL:-}"
+                if [[ "$winsrc" == "iso" && -n "${SOCOOL_WINDOWS_ISO_PATH:-}" ]]; then
+                    win_url="file://${SOCOOL_WINDOWS_ISO_PATH}"
+                fi
+                if [[ -z "$win_url" ]]; then
+                    die 40 "windows-victim build needs SOCOOL_WINDOWS_ISO_URL (for eval) or SOCOOL_WINDOWS_ISO_PATH (for iso). See packer/windows-victim/README.md."
+                fi
+                packer_vars+=("-var=windows_iso_url=$win_url")
+                packer_vars+=("-var=windows_iso_checksum=${SOCOOL_WINDOWS_ISO_CHECKSUM:-none}")
+                ;;
+            nessus)
+                # CHANGE_ME_AT_RUNTIME is the .env.example sentinel;
+                # treat it as unset so the user gets an actionable
+                # error rather than a confusing Packer URL-parse
+                # failure 20 minutes into the build.
+                local nessus_deb="${SOCOOL_NESSUS_DEB_URL:-}"
+                local nessus_code="${SOCOOL_NESSUS_ACTIVATION_CODE:-}"
+                [[ "$nessus_deb"  == "CHANGE_ME_AT_RUNTIME" ]] && nessus_deb=""
+                [[ "$nessus_code" == "CHANGE_ME_AT_RUNTIME" ]] && nessus_code=""
+                [[ -n "$nessus_deb"  ]] || die 40 "nessus build needs SOCOOL_NESSUS_DEB_URL (Tenable download URL or file:// path). See packer/nessus/README.md."
+                [[ -n "$nessus_code" ]] || die 40 "nessus build needs SOCOOL_NESSUS_ACTIVATION_CODE (emailed by Tenable at sign-up)."
+                packer_vars+=("-var=nessus_deb_url=$nessus_deb")
+                packer_vars+=("-var=nessus_activation_code=$nessus_code")
+                ;;
+        esac
+
+        # Argument array; no string concatenation. Explicit exit-code
+        # translation: Packer's raw exit (1, 2, ...) becomes our
+        # documented 40 so docs/troubleshooting.md's code index is
+        # meaningful. Without the `|| rc=$?` dance, set -e would kill
+        # setup.sh with whatever Packer emitted, never reaching die 40.
+        local rc=0
+        (
+            cd -- "$repo_root/packer/$vm"
+            packer init -- "$template"
+        ) || rc=$?
+        [[ "$rc" == "0" ]] || die 40 "packer init failed for $vm (upstream exit $rc)"
+
+        rc=0
+        (
+            cd -- "$repo_root/packer/$vm"
+            packer build -only="$packer_source" "${packer_vars[@]}" -- "$template"
+        ) || rc=$?
+        [[ "$rc" == "0" ]] || die 40 "packer build failed for $vm (upstream exit $rc)"
+        built=$((built+1))
+    done < <(lab_vm_hostnames)
+
+    log_info "pipeline summary: built=$built skipped=$skipped template-missing=$missing"
+
+    # Final stage: vagrant up the lab.
+    local vagrantfile="$repo_root/vagrant/Vagrantfile"
+    if [[ ! -f "$vagrantfile" ]]; then
+        log_warn "Vagrantfile missing: $vagrantfile (Step 6 pending). The lab cannot be started yet."
+        return 0
+    fi
+    banner "vagrant up"
+    local rc=0
+    (
+        cd -- "$repo_root/vagrant"
+        vagrant up --provider "$(_vagrant_provider_for "$hv")"
+    ) || rc=$?
+    [[ "$rc" == "0" ]] || die 50 "vagrant up failed (upstream exit $rc)"
+}
+
+# _vagrant_provider_for <hypervisor> — maps our hypervisor name to Vagrant's.
+_vagrant_provider_for() {
+    case "$1" in
+        virtualbox) printf 'virtualbox' ;;
+        libvirt)    printf 'libvirt' ;;
+        *) die 1 "_vagrant_provider_for: unknown '$1'" ;;
+    esac
+}
+
+# _lab_vm_index <hostname> — returns the vms[] list index (0-based).
+_lab_vm_index() {
+    local target="$1"
+    python3 - "$socool_repo_root/config/lab.yml" "$target" <<'PY'
+import sys, yaml
+with open(sys.argv[1], 'r') as f:
+    data = yaml.safe_load(f)
+for i, vm in enumerate(data.get('vms', [])):
+    if vm['hostname'] == sys.argv[2]:
+        print(i)
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
+# If invoked directly (not sourced), run the pipeline with the first three
+# positional arguments so a maintainer can test in isolation.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    detect_host
+    load_env
+    run_pipeline "${1:-}" "${2:-}" "${3:-}"
+fi

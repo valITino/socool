@@ -1,0 +1,58 @@
+# packer/pfsense/http/installerconfig — bsdinstall unattended script.
+#
+# bsdinstall reads this file from /tmp/installerconfig after the Packer
+# boot_command fetch step. Syntax reference: bsdinstall(8), specifically
+# the "SCRIPTING" section. pfSense's installer is a FreeBSD bsdinstall
+# with a handful of pfSense-specific quirks documented in
+# https://docs.netgate.com/pfsense/en/latest/install/install-walkthrough.html
+
+# Disk and partitioning — whole-disk UFS for simplicity; ZFS omitted
+# because this is a 8 GB appliance image and ZFS metadata overhead
+# doesn't pay off. Single vtbd0 (virtio) or ada0 (virtualbox) disk.
+PARTITIONS=DEFAULT
+DISTRIBUTIONS="kernel.txz base.txz"
+
+# Post-install steps run inside the new system's chroot. We:
+#   1. Set a build-only root password (rotated later by SSH provisioner).
+#   2. Drop the seed config.xml into /conf where pfSense picks it up on
+#      first boot.
+#   3. Enable sshd so Packer's `provisioner "shell"` can connect once
+#      the VM reboots.
+#   4. Disable the pfSense "first boot" wizard so the config seed is
+#      authoritative.
+#
+# The pfSense-specific setup_installer.sh that normally runs post-install
+# (from the ISO's /usr/local/bin/pfSense-upgrade) is out of scope for
+# this scaffold — the image we're building is a plain FreeBSD +
+# pfSense packages that Vagrant boots and then configures via Vagrantfile.
+# See packer/pfsense/README.md for the "finish-the-install" note.
+
+#!/bin/sh
+echo "pfsense" | pw usermod root -h 0
+
+# Enable SSH for Packer's provisioner; the pfSense webConfigurator
+# will take over after first boot.
+echo 'sshd_enable="YES"' >> /etc/rc.conf
+echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
+echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
+
+# Network: assign all three NICs in /etc/rc.conf so pfSense's boot
+# initialisation sees them. The config.xml seed drops in next.
+cat >> /etc/rc.conf <<RCEOF
+hostname="pfsense.socool.local"
+ifconfig_vtnet0="DHCP"                 # WAN (NAT to host)
+ifconfig_vtnet1="inet 10.42.10.1 netmask 255.255.255.0"   # LAN
+ifconfig_vtnet2="inet 10.42.20.1 netmask 255.255.255.0"   # management
+defaultrouter=""
+RCEOF
+
+# Fetch the config seed dropped by Packer into /tmp and put it where
+# pfSense expects. /cf/conf is a symlink to /conf on a running pfSense,
+# but during bsdinstall chroot it is a plain directory.
+install -d /cf/conf
+cp -v /tmp/config-seed.xml /cf/conf/config.xml 2>/dev/null || true
+
+# Disable setup wizard so the seeded config is authoritative.
+touch /cf/conf/trigger_initial_wizard_done
+
+exit 0

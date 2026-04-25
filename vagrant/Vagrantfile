@@ -1,0 +1,236 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# vagrant/Vagrantfile — SOCool lab orchestration.
+#
+# Reads config/lab.yml and brings up each VM in boot_order with its
+# networks wired to host-only private networks matching the CIDRs
+# declared there. NEVER bridges to the user's LAN by default (per
+# CLAUDE.md and docs/adr/0002-hypervisor-matrix.md); bridged opt-in is
+# gated behind SOCOOL_ALLOW_BRIDGED=1 plus an interactive warning at
+# the setup.sh layer, not here.
+#
+# Boot ordering: Vagrant launches `vagrant up` targets in Vagrantfile
+# definition order when no specific name is given. We sort lab.yml's
+# vms[] by boot_order before declaring, so pfSense comes up first and
+# is ready (LAN/management interfaces online) before any client VM.
+# Inter-VM waits are provisioning-layer concerns, not this file's.
+
+require 'yaml'
+
+VAGRANTFILE_API_VERSION = '2'
+
+# ────────────────────────────────────────────────────────────────────────
+# Config loading & validation
+# ────────────────────────────────────────────────────────────────────────
+
+def socool_repo_root
+  File.expand_path('..', __dir__)
+end
+
+def socool_load_lab
+  path = File.join(socool_repo_root, 'config', 'lab.yml')
+  unless File.exist?(path)
+    raise "SOCool: config/lab.yml not found at #{path}"
+  end
+  # safe_load_file rejects arbitrary ruby deserialisation (CVE-2013-0269-class
+  # attacks in older Psych). Vagrant 2.4 ships on Ruby 3 which defaults to
+  # safe, but being explicit makes the intent clear to future readers.
+  lab = YAML.safe_load_file(path, aliases: true, permitted_classes: [Symbol])
+  unless lab.is_a?(Hash) && lab['vms'].is_a?(Array)
+    raise "SOCool: config/lab.yml missing `vms:` array"
+  end
+  lab
+end
+
+# Validate that a hostname-like string from lab.yml is safe to use as
+# a VM name, an internal network name, and a filesystem path fragment.
+# Same regex the bash helpers enforce.
+HOSTNAME_RE = /\A[a-z][a-z0-9-]{0,30}\z/.freeze
+
+def socool_assert_token(value, field)
+  unless value.is_a?(String) && value.match?(HOSTNAME_RE)
+    raise "SOCool: invalid #{field} '#{value}' (must match #{HOSTNAME_RE.source})"
+  end
+end
+
+# ────────────────────────────────────────────────────────────────────────
+# Environment-driven knobs
+# ────────────────────────────────────────────────────────────────────────
+
+def socool_scanner_choice
+  v = ENV.fetch('SOCOOL_SCANNER', 'none')
+  unless %w[nessus openvas none].include?(v)
+    raise "SOCool: invalid SOCOOL_SCANNER=#{v.inspect} (expected nessus|openvas|none)"
+  end
+  v
+end
+
+def socool_box_output_dir
+  ENV['SOCOOL_BOX_OUTPUT_DIR'] || File.join(socool_repo_root, '.socool-cache', 'boxes')
+end
+
+def socool_allow_bridged?
+  ENV['SOCOOL_ALLOW_BRIDGED'] == '1'
+end
+
+# ────────────────────────────────────────────────────────────────────────
+# Per-VM filtering
+# ────────────────────────────────────────────────────────────────────────
+
+# Returns true if this VM should be defined for the current run. Scanner
+# VMs are mutually exclusive; the user's SOCOOL_SCANNER picks exactly one.
+def socool_include_vm?(vm, scanner_choice)
+  case vm['hostname']
+  when 'nessus'  then scanner_choice == 'nessus'
+  when 'openvas' then scanner_choice == 'openvas'
+  else true
+  end
+end
+
+# ────────────────────────────────────────────────────────────────────────
+# Network wiring
+# ────────────────────────────────────────────────────────────────────────
+
+# Map lab.yml network-role names to the internal name we use on the
+# VirtualBox/libvirt side. The wan_sim role is special: pfSense's WAN
+# NIC is Vagrant's default NAT NIC (NIC 0), which gives pfSense outbound
+# Internet via the host. The other two roles are host-only.
+SOCOOL_NETWORK_ROLES = {
+  'lan'        => 'socool-lan',
+  'management' => 'socool-management'
+}.freeze
+
+# Declare a host-only NIC for `network_role` on the given IP.
+# The host CAN reach this network (for admin access to Wazuh, Kali,
+# pfSense webConfigurator, etc.) but the network is NOT bridged to
+# any physical interface. `virtualbox__intnet: false` is implicit here
+# (host-only is the default for :private_network). libvirt gets a
+# named, DHCP-disabled network with the host as .1 on each subnet.
+def socool_attach_private_network(node, role, ip, netmask: '255.255.255.0', host_ip: nil)
+  net_name = SOCOOL_NETWORK_ROLES.fetch(role) do
+    raise "SOCool: unknown network_role '#{role}'"
+  end
+  opts = {
+    ip: ip,
+    netmask: netmask,
+    libvirt__network_name: net_name,
+    libvirt__dhcp_enabled: false
+  }
+  opts[:libvirt__host_ip] = host_ip if host_ip
+  node.vm.network :private_network, **opts
+end
+
+# ────────────────────────────────────────────────────────────────────────
+# Main Vagrantfile body
+# ────────────────────────────────────────────────────────────────────────
+
+lab              = socool_load_lab
+scanner_choice   = socool_scanner_choice
+box_output_dir   = socool_box_output_dir
+allow_bridged    = socool_allow_bridged?
+
+# Sort once, up-front. This is the lab boot order — pfSense first.
+sorted_vms = lab['vms'].sort_by { |v| v['boot_order'] || 9999 }
+
+# A one-line provisioner-time warning is cheap insurance that the
+# isolation promise in CLAUDE.md survives a future commit that
+# accidentally enables bridging.
+if allow_bridged
+  $stderr.puts '[WARN] SOCOOL_ALLOW_BRIDGED=1 — bridging confirmation already taken at setup.* layer.'
+end
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  # Global defaults. Disable the /vagrant synced folder everywhere by
+  # default — exposing the user's repo (with its rotated creds under
+  # packer/*/artifacts/) into every lab VM would be an unwanted leak.
+  config.vm.synced_folder '.', '/vagrant', disabled: true
+
+  # Disable the upstream box-version check; our boxes are file-local
+  # and the URL-based version probe would fail noisily.
+  config.vm.box_check_update = false
+
+  sorted_vms.each do |vm|
+    next unless socool_include_vm?(vm, scanner_choice)
+
+    name    = vm.fetch('hostname')
+    role    = vm.fetch('role')
+    box     = vm.fetch('box')
+    ram_mb  = vm.fetch('ram_mb').to_i
+    cpus    = vm.fetch('cpus').to_i
+
+    socool_assert_token(name, 'hostname')
+    socool_assert_token(box.sub(/-\d+\.\d+\.\d+\z/, ''), 'box (base name)')
+
+    config.vm.define name do |node|
+      node.vm.hostname = name
+      node.vm.box      = box
+
+      # Point at the local .box file Packer produced. Vagrant registers
+      # it on first `up` if the box is not already in the user's box
+      # store.
+      local_box = File.join(box_output_dir, "#{box}.box")
+      node.vm.box_url = "file://#{local_box}" if File.exist?(local_box)
+
+      # ── Networks ────────────────────────────────────────────────
+      if vm['network_role'] == 'multi'
+        # pfSense: three NICs. Vagrant's default NAT NIC (NIC 0) serves
+        # as the simulated WAN (pfSense's upstream). We then attach
+        # LAN and management host-only networks; pfSense's interface
+        # IPs are set from its seeded config.xml at install time (see
+        # packer/pfsense/http/config-seed.xml), not here.
+        (vm['interfaces'] || []).each do |iface|
+          network = iface.fetch('network')
+          ip      = iface.fetch('ip')
+          case network
+          when 'wan_sim'
+            # No explicit NIC: Vagrant's NAT NIC (always present for
+            # SSH) fills this role. pfSense's WAN interface pulls DHCP
+            # from it.
+            next
+          when 'lan', 'management'
+            socool_attach_private_network(
+              node,
+              network,
+              ip,
+              host_ip: (network == 'lan' ? '10.42.10.2' : '10.42.20.2')
+            )
+          else
+            raise "SOCool: pfSense interface has unknown network '#{network}'"
+          end
+        end
+      else
+        # Single-network VM (Kali, Windows, Wazuh, scanner).
+        ip = vm.fetch('ip')
+        socool_attach_private_network(node, vm.fetch('network_role'), ip)
+      end
+
+      # ── VirtualBox provider ─────────────────────────────────────
+      node.vm.provider :virtualbox do |vb|
+        vb.name    = "socool-#{name}"
+        vb.memory  = ram_mb
+        vb.cpus    = cpus
+        vb.linked_clone        = true
+        vb.check_guest_additions = false   # baked in by Packer already
+        vb.customize ['modifyvm', :id, '--nictype1', 'virtio']
+        # Nested virt only for scanner VMs that drive nested scans.
+        if role == 'scanner'
+          vb.customize ['modifyvm', :id, '--nested-hw-virt', 'on']
+        end
+      end
+
+      # ── libvirt provider ────────────────────────────────────────
+      node.vm.provider :libvirt do |lv|
+        lv.driver = 'kvm'
+        lv.memory = ram_mb
+        lv.cpus   = cpus
+        lv.machine_virtual_size = (vm['disk_gb'] || 40).to_i
+        lv.nested = true if role == 'scanner'
+      end
+
+      # No global shell provisioner here — Packer baked the VM image
+      # fully. Per-VM runtime adjustments (e.g., set default gateway
+      # to pfSense) are the per-VM concern, handled at build time.
+    end
+  end
+end

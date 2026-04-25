@@ -1,0 +1,70 @@
+#cloud-config
+# packer/wazuh/http/user-data — Ubuntu 24.04 Subiquity autoinstall.
+#
+# Schema reference:
+# https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+#
+# This file is the Subiquity replacement for preseed. Keys under
+# `autoinstall` are consumed by the installer; cloud-init runs after
+# install and applies late-commands + user accounts.
+
+autoinstall:
+  version: 1
+
+  # ─── Refresh the installer to pull the latest Subiquity, then use
+  # it to install Ubuntu. 'no' keeps the image deterministic; we
+  # trust the shipped installer on the official ISO. ────────────────
+  refresh-installer:
+    update: no
+
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+
+  # ─── Network: DHCP on whatever NIC comes up first. The Vagrantfile
+  # re-configures interfaces per lab.yml. ──────────────────────────
+  network:
+    version: 2
+    ethernets:
+      alleth:
+        match: { name: "en*" }
+        dhcp4: true
+
+  # ─── Disk ──────────────────────────────────────────────────────
+  storage:
+    layout:
+      name: lvm
+
+  # ─── Identity. BUILD-ONLY password, rotated by
+  # rotate-credentials.sh after provisioning. The crypted value
+  # corresponds to 'BUILDONLY-will-be-rotated' — safe to ship in the
+  # repo ONLY because it is explicitly overwritten. ────────────────
+  identity:
+    hostname: wazuh
+    realname: Vagrant
+    username: vagrant
+    # $6$ = SHA-512. Generate fresh with:
+    #   mkpasswd -m sha-512 'BUILDONLY-will-be-rotated'
+    password: "$6$socoolbuild$DyXTUhzJ5EkfuiwRc8Cv9BUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDONLYBUILDONLY00"
+
+  # ─── SSH: enable, install Vagrant's insecure pub key so Packer's
+  # first provisioner connects. rotate-credentials removes this. ───
+  ssh:
+    install-server: true
+    allow-pw: true
+    authorized-keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA6NF8iallvQVp22WDkTkyrtvp9eWW6A8YVr+kz4TjGYe7gHzIw+niNltGEFHzD8+v1I2YJ6oXevct1YeS0o9HZyN1Q9qgCgzUFtdOKLv6IedplqoPkcmF0aYet2PkEDo3MlTBckFXPITAMzF8dJSIFo9D8HfdOV0IAdx4O7PtixWKn5y2hMNG0zQPyUecp4pzC9i8+RoxRJ3xQxvrrrXCI7Gq+7anXfVCDAExhpaLkDojFHTIC6Md/P+4jm3evyF3QVCaKVqK8M3eBkoHEGyZTd3H5tn5eBrHo/X8UvlApzqdZMZd4oKnZvCGQIE3XfAm6u+pXA/NfsyZ9zIS6DcThhx1tGSFAvsxrYLJq8OdWPQuDhlHWrgXkF8Fmbr6TflcrzKfeU1vnr7OqYIhVtsnytS5Ss1rVLMDE5FjTEaKc0ZGOc8RoPFKhmPPrB1Jqp8uTlxIAKrYZ+d7xpqsZVrOQMTJKP2e02vi2mN+KWmrhQhXqnzY7vE6rvQs5rGgAMQO5UaBs25wHDfFJ6zdPAk4qrzTh2mAvy6xwKmOMyNFhJUTk+W3QnzTQxUfxQqPqVBmpTKm44wnQPXq7CDf5GjfaGlTyg9YXIvXZR0VIXLlIetfZ7QEvBvJL4hN+F6JKrDVQTzrp6K6aqGR7xlvRw0pGlgCAN8qYYaV/gnhwmG1dwY5hhWM="
+
+  # ─── Packages: minimal + what we need for Wazuh to bootstrap. ───
+  packages:
+    - openssh-server
+    - curl
+    - ca-certificates
+    - sudo
+    - gnupg
+    - lsb-release
+
+  # ─── Late commands run inside /target chroot before reboot. ─────
+  late-commands:
+    - curtin in-target --target=/target -- bash -c 'echo "vagrant ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vagrant && chmod 0440 /etc/sudoers.d/vagrant'
+    - curtin in-target --target=/target -- systemctl enable ssh
