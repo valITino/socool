@@ -31,7 +31,8 @@ run() {
     esac
 }
 
-run "parity"     "parity"     bash "$REPO_ROOT/tests/parity/check-parity.sh"
+run "parity"           "parity"           bash "$REPO_ROOT/tests/parity/check-parity.sh"
+run "uninstall-parity" "uninstall-parity" bash "$REPO_ROOT/tests/parity/check-uninstall-parity.sh"
 run "preflight-dispatch" "preflight-dispatch" bash "$REPO_ROOT/tests/preflight/test-checks.sh"
 run "preflight-mocked"   "preflight-mocked"   bash "$REPO_ROOT/tests/preflight/test-mocked.sh"
 run "vagrantfile" "vagrantfile" ruby -W0 "$REPO_ROOT/tests/vagrant/test-vagrantfile.rb"

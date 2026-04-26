@@ -12,6 +12,24 @@ The whole `0.1.0-dev` stream lives here until the project runs its
 first successful end-to-end build on a real hypervisor. See
 [README](./README.md) for current scaffold status.
 
+### Added
+
+- **Uninstall scripts** — `uninstall.sh` and `uninstall.ps1` at the
+  repo root, plus shared phase logic under `scripts/uninstall/`.
+  Default phases destroy the lab VMs (`vagrant destroy -f`), remove
+  `socool-*` boxes from the local Vagrant store, uninstall the
+  `vagrant-libvirt` plugin if present, and clear `.socool-cache/`,
+  `packer/*/artifacts/` (rotated credentials), `packer_cache/`, and
+  stray `*.box` files. `.env` removal and host-package uninstall
+  (packer/vagrant/hypervisor) are opt-in via `--env` / `-EnvFile`
+  and `--packages` / `-Packages` respectively, mirroring the same
+  detect-and-refuse philosophy that keeps `setup.*` from
+  auto-disabling Hyper-V or auto-configuring the HashiCorp apt repo.
+  `--dry-run` previews every command without changes. New exit codes
+  `80–86` documented in `docs/troubleshooting.md`. Parity is enforced
+  by `tests/parity/check-uninstall-parity.sh`. Skills consulted:
+  shell-scripting, devops, secure-coding, devsecops, documentation.
+
 ## [0.1.0-dev] — 2026-04-24
 
 Initial scaffold of a one-command SOC lab provisioner. Every

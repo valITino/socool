@@ -42,6 +42,29 @@ resolve the hypervisor, and drive the per-VM provisioning pipeline. Every
 prompt has an environment-variable equivalent for non-interactive CI use; see
 [`.env.example`](./.env.example).
 
+## Uninstall
+
+Tear the lab down and reclaim disk space with the matching uninstall scripts:
+
+```bash
+# Linux / macOS
+./uninstall.sh             # default: VMs + boxes + caches
+./uninstall.sh --dry-run   # preview only
+./uninstall.sh --all --yes # also remove .env and host packages
+
+# Windows (PowerShell 7+)
+./uninstall.ps1
+./uninstall.ps1 -DryRun
+./uninstall.ps1 -All -Yes
+```
+
+Default uninstall leaves your `.env` and host packages (packer, vagrant,
+hypervisor) alone — they're commonly used by other projects. Pass `--env` /
+`-EnvFile` and `--packages` / `-Packages` to opt in. The script never deletes
+the repo directory itself; it prints the `rm -rf` line at the end. See
+[`scripts/uninstall/README.md`](./scripts/uninstall/README.md) for the full
+phase list, safety rules, and exit codes.
+
 ## Requirements
 
 | Resource | Minimum (base lab, no scanner) | With scanner | Recommended |
