@@ -119,25 +119,47 @@ jobs:
       - name: packer fmt -check (recursive)
         run: packer fmt -check -recursive packer/
       - name: packer init + validate (each template)
-        # validate needs `hypervisor` and `output_dir` (no defaults). We
-        # pass placeholder values; validate is a syntactic + reference
-        # check, not a build. Two passes ensure both providers are valid.
+        # validate needs every variable without a default in scope. We
+        # pass placeholders for everything required; validate is a
+        # syntactic + reference check, not a build, so the values just
+        # need to be type-correct. Two passes (virtualbox + libvirt)
+        # exercise both source blocks.
+        #
+        # Required-var inventory (no defaults):
+        #   all VMs          hypervisor, output_dir
+        #   nessus           nessus_deb_url, nessus_activation_code
+        #   windows-victim   windows_iso_url
+        #
+        # Per-VM placeholders are added inside the loop so we never pass
+        # a `-var` for a variable the template doesn't declare (Packer
+        # treats undeclared `-var` as an error in 1.11+).
         run: |
           set -euo pipefail
           for tpl_dir in packer/*/; do
             [[ -f "$tpl_dir/template.pkr.hcl" ]] || continue
-            echo "== $tpl_dir =="
+            vm_name="$(basename "$tpl_dir")"
+            extra_vars=()
+            case "$vm_name" in
+              nessus)
+                extra_vars+=(-var "nessus_deb_url=https://example.test/Nessus.deb")
+                extra_vars+=(-var "nessus_activation_code=AAAA-BBBB-CCCC-DDDD")
+                ;;
+              windows-victim)
+                extra_vars+=(-var "windows_iso_url=https://example.test/windows.iso")
+                ;;
+            esac
+            echo "== $vm_name =="
             (
               cd "$tpl_dir"
               packer init .
               packer validate \
                 -var "hypervisor=virtualbox" \
                 -var "output_dir=/tmp/socool-validate" \
-                .
+                "${extra_vars[@]}" .
               packer validate \
                 -var "hypervisor=libvirt" \
                 -var "output_dir=/tmp/socool-validate" \
-                .
+                "${extra_vars[@]}" .
             )
           done
 
