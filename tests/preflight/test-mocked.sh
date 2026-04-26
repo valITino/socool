@@ -159,8 +159,12 @@ run_case "check-tools-version: _vercmp handles versions correctly" test_vercmp_h
 test_network_cidr_overlap_detected() {
     # Simulate a host with 10.42.10.0/24 already routed (collides with
     # the lab's LAN). We feed that route directly into the same python
-    # snippet the check uses.
-    python3 - "$REPO_ROOT/config/lab.yml" <<'PY' <<<'10.42.10.0/24'
+    # snippet the check uses. The script body has to live in a temp
+    # file: a `python3 -` heredoc combined with a pipe (or here-string)
+    # has two redirections targeting stdin, and the last one wins.
+    local script
+    script="$(mktemp -t socool-cidr-test-XXXXXX.py)"
+    cat > "$script" <<'PY'
 import ipaddress, sys, yaml
 with open(sys.argv[1]) as f:
     data = yaml.safe_load(f)
@@ -176,7 +180,9 @@ for line in sys.stdin:
             hits.append(f"{role} overlap")
 sys.exit(1 if hits else 0)
 PY
-    local rc=$?
+    local rc=0
+    printf '%s\n' '10.42.10.0/24' | python3 "$script" "$REPO_ROOT/config/lab.yml" || rc=$?
+    rm -f -- "$script"
     [[ "$rc" == "1" ]] || { echo "expected overlap detected (rc=1), got $rc"; return 1; }
 }
 run_case "check-network-cidr: lab overlap fires on 10.42.10.0/24" test_network_cidr_overlap_detected

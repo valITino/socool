@@ -43,8 +43,12 @@ case "$SOCOOL_OS" in
 esac
 
 # Pass host networks on stdin and lab CIDRs via argv to python.
-overlap="$(
-    printf '%s\n' "$host_nets" | python3 - "$socool_repo_root/config/lab.yml" <<'PY'
+# The script body lives in a temp file because mixing a heredoc and a
+# pipe both targeting stdin is undefined: the last redirection wins,
+# so the heredoc would silently swallow the piped host_nets.
+overlap_script="$(mktemp -t socool-cidr-XXXXXX.py)"
+trap 'rm -f -- "$overlap_script"' EXIT
+cat > "$overlap_script" <<'PY'
 import ipaddress, sys, yaml
 with open(sys.argv[1]) as f:
     data = yaml.safe_load(f)
@@ -76,7 +80,10 @@ if hits:
         print(h)
     sys.exit(1)
 PY
-)" || overlap_rc=$?
+
+overlap_rc=0
+overlap="$(printf '%s\n' "$host_nets" | python3 "$overlap_script" "$socool_repo_root/config/lab.yml")" \
+    || overlap_rc=$?
 
 if [[ -n "${overlap:-}" ]]; then
     log_error "network-cidr overlap detected:"

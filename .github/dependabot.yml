@@ -1,0 +1,21 @@
+# .github/dependabot.yml — keep GitHub Actions versions current.
+#
+# Only the github-actions ecosystem is enabled. Hypervisor / Packer /
+# Vagrant boxes are pinned in config/lab.yml and reviewed manually as
+# part of the devsecops Phase-1 supply-chain check (see CLAUDE.md).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+    labels:
+      - ci
+      - dependencies

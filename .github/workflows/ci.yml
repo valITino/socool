@@ -1,0 +1,214 @@
+# .github/workflows/ci.yml — pull-request gate.
+#
+# Runs on every PR targeting main and every push to main. Each job is
+# independent and runs in parallel; the workflow as a whole fails if any
+# required job fails.
+#
+# What is checked:
+#   - shellcheck     bash scripts (errors only)
+#   - psscriptanalyzer  PowerShell scripts (errors + warnings)
+#   - yamllint       YAML files (config/lab.yml + workflows themselves)
+#   - packer-validate  Packer HCL2 templates (fmt + init + validate)
+#   - ruby-syntax    Vagrantfile + ruby tests
+#   - tests          tests/run-all.sh (parity, preflight, vagrantfile)
+#   - secrets-scan   gitleaks across the working tree
+#   - markdown-lint  markdownlint on docs and READMEs
+#
+# Notes:
+#   - Lab-dependent tests (smoke/idempotency/destroy-recreate) auto-skip
+#     because tests/run-all.sh gates them on SOCOOL_LAB_UP=1, which is
+#     never set in CI.
+#   - The matrix is Linux-only. The bash/powershell parity test enforces
+#     drift between setup.sh and setup.ps1; PSScriptAnalyzer runs under
+#     pwsh on Ubuntu, which is sufficient for static analysis. A future
+#     expansion can add windows-latest if integration tests are added.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    name: ShellCheck (bash)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        # Severity = error catches real bugs without forcing a refactor of
+        # pre-existing style warnings. Tighten in a follow-up PR.
+        uses: ludeeus/action-shellcheck@2.0.0
+        env:
+          SHELLCHECK_OPTS: --shell=bash --severity=error --external-sources
+        with:
+          severity: error
+          # Packer per-VM provisioner scripts run inside the guest with
+          # different shell semantics (no set -euo, distro-specific tools);
+          # they're audited as part of the packer skill, not bash CI.
+          ignore_paths: >-
+            packer
+
+  psscriptanalyzer:
+    name: PSScriptAnalyzer (PowerShell)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+      - name: Run analyzer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sep = [IO.Path]::DirectorySeparatorChar
+          $gitSegment = [regex]::Escape($sep + '.git' + $sep)
+          $files = Get-ChildItem -Recurse -Include '*.ps1','*.psm1','*.psd1' -File `
+            | Where-Object { $_.FullName -notmatch $gitSegment }
+          if (-not $files) { Write-Host 'No PowerShell files found.'; exit 0 }
+          $diagnostics = @()
+          foreach ($file in $files) {
+            $diag = Invoke-ScriptAnalyzer -Path $file.FullName -Severity @('Error','Warning')
+            if ($diag) { $diagnostics += $diag }
+          }
+          if ($diagnostics) {
+            $diagnostics | Format-Table -AutoSize RuleName, Severity, ScriptName, Line, Message
+            Write-Error "PSScriptAnalyzer found $($diagnostics.Count) issue(s)."
+            exit 1
+          }
+          Write-Host "PSScriptAnalyzer: $($files.Count) file(s) clean."
+
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install yamllint
+        run: pip install --user yamllint==1.35.1
+      - name: Run yamllint
+        run: yamllint --strict .
+
+  packer-validate:
+    name: Packer (fmt + validate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-packer@v3
+        with:
+          version: '1.11.2'
+      - name: packer fmt -check (recursive)
+        run: packer fmt -check -recursive packer/
+      - name: packer init + validate (each template)
+        # validate needs `hypervisor` and `output_dir` (no defaults). We
+        # pass placeholder values; validate is a syntactic + reference
+        # check, not a build. Two passes ensure both providers are valid.
+        run: |
+          set -euo pipefail
+          for tpl_dir in packer/*/; do
+            [[ -f "$tpl_dir/template.pkr.hcl" ]] || continue
+            echo "== $tpl_dir =="
+            (
+              cd "$tpl_dir"
+              packer init .
+              packer validate \
+                -var "hypervisor=virtualbox" \
+                -var "output_dir=/tmp/socool-validate" \
+                .
+              packer validate \
+                -var "hypervisor=libvirt" \
+                -var "output_dir=/tmp/socool-validate" \
+                .
+            )
+          done
+
+  ruby-syntax:
+    name: Ruby syntax (Vagrantfile + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: ruby -c on Vagrantfile
+        run: ruby -c vagrant/Vagrantfile
+      - name: ruby -c on test files
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do
+            ruby -c "$f"
+          done < <(find tests -name '*.rb' -type f)
+
+  tests:
+    name: Tests (run-all.sh)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python deps
+        run: pip install --user pyyaml
+      - name: Install minitest
+        run: gem install minitest --no-document
+      - name: Run test suite
+        env:
+          # Explicit: lab is NOT up in CI, so smoke/idempotency/
+          # destroy-recreate auto-skip via tests/run-all.sh's gating.
+          SOCOOL_LAB_UP: '0'
+        run: bash tests/run-all.sh
+
+  secrets-scan:
+    name: Secrets scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks needs full history to scan commits, not just the
+          # working tree.
+          fetch-depth: 0
+      - name: Install gitleaks
+        # Pinned by version, fetched directly from the publisher's GitHub
+        # release (per devsecops skill: every download is from a
+        # publisher HTTPS endpoint).
+        run: |
+          set -euo pipefail
+          GL_VERSION=8.21.2
+          base="https://github.com/gitleaks/gitleaks/releases/download"
+          tar="gitleaks_${GL_VERSION}_linux_x64.tar.gz"
+          curl -sSLf "${base}/v${GL_VERSION}/${tar}" -o /tmp/gitleaks.tgz
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+      - name: Scan working tree
+        run: gitleaks detect --no-banner --redact --verbose --exit-code 1 --source .
+      - name: Scan commit history
+        run: gitleaks detect --no-banner --redact --verbose --exit-code 1 --log-opts="--all"
+
+  markdown-lint:
+    name: markdownlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: |
+            **/*.md
+            !**/node_modules/**
+            !.git/**
