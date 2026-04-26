@@ -73,8 +73,11 @@ fi
 
 # 4. packer
 if command -v packer >/dev/null 2>&1; then
-    # `packer --version` prints e.g. "1.11.2"
-    ver="$(packer --version 2>/dev/null | head -1 | sed 's/^v//')"
+    # `packer --version` may print multiple lines (release notes); we
+    # capture the full output first to avoid SIGPIPE on `cmd | head -1`
+    # under `set -o pipefail`.
+    _packer_out="$(packer --version 2>/dev/null || true)"
+    ver="$(printf '%s\n' "$_packer_out" | head -n1 | sed 's/^v//')"
     _check_min packer 1.10 "$ver"
 fi
 
@@ -98,7 +101,12 @@ fi
 # version is sturdier.
 for _qemu in qemu-system-x86_64 qemu-system-aarch64; do
     if command -v "$_qemu" >/dev/null 2>&1; then
-        ver="$("$_qemu" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+        # Capture full output before piping into `head` — qemu prints
+        # several lines (version, copyright, license) and `head -1` would
+        # SIGPIPE the producer under `set -o pipefail`.
+        _qemu_out="$("$_qemu" --version 2>/dev/null || true)"
+        ver="$(printf '%s\n' "$_qemu_out" | head -n1 \
+            | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 || true)"
         [[ -z "$ver" ]] && continue
         _check_min "$_qemu" 6.0 "$ver"
     fi

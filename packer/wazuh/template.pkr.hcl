@@ -27,14 +27,14 @@ locals {
 
 # ─── Source: VirtualBox ─────────────────────────────────────────────────
 source "virtualbox-iso" "vm" {
-  vm_name              = local.vm_name
-  guest_os_type        = "Ubuntu_64"
-  iso_url              = local.iso_url
-  iso_checksum         = local.iso_checksum
-  iso_target_path      = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/ubuntu-${var.ubuntu_release}.iso"
+  vm_name         = local.vm_name
+  guest_os_type   = "Ubuntu_64"
+  iso_url         = local.iso_url
+  iso_checksum    = local.iso_checksum
+  iso_target_path = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/ubuntu-${var.ubuntu_release}.iso"
 
-  cpus     = var.cpus
-  memory   = var.ram_mb
+  cpus      = var.cpus
+  memory    = var.ram_mb
   disk_size = var.disk_gb * 1024
 
   http_directory = "${path.root}/http"
@@ -62,25 +62,25 @@ source "virtualbox-iso" "vm" {
     ["modifyvm", "{{.Name}}", "--firmware", "efi"],
   ]
 
-  ssh_username       = "vagrant"
-  ssh_password       = "BUILDONLY-will-be-rotated"
-  ssh_port           = 22
-  ssh_wait_timeout   = "45m"
+  ssh_username           = "vagrant"
+  ssh_password           = "BUILDONLY-will-be-rotated"
+  ssh_port               = 22
+  ssh_wait_timeout       = "45m"
   ssh_handshake_attempts = 200
 
   shutdown_command = "echo 'BUILDONLY-will-be-rotated' | sudo -S shutdown -P now"
-  format = "ovf"
+  format           = "ovf"
 }
 
 # ─── Source: QEMU / libvirt ────────────────────────────────────────────
 source "qemu" "vm" {
-  vm_name          = local.vm_name
-  iso_url          = local.iso_url
-  iso_checksum     = local.iso_checksum
-  iso_target_path  = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/ubuntu-${var.ubuntu_release}.iso"
+  vm_name         = local.vm_name
+  iso_url         = local.iso_url
+  iso_checksum    = local.iso_checksum
+  iso_target_path = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/ubuntu-${var.ubuntu_release}.iso"
 
-  cpus     = var.cpus
-  memory   = var.ram_mb
+  cpus      = var.cpus
+  memory    = var.ram_mb
   disk_size = "${var.disk_gb}G"
 
   http_directory = "${path.root}/http"
@@ -98,23 +98,23 @@ source "qemu" "vm" {
     "<enter>"
   ]
 
-  ssh_username       = "vagrant"
-  ssh_password       = "BUILDONLY-will-be-rotated"
-  ssh_port           = 22
-  ssh_wait_timeout   = "45m"
+  ssh_username           = "vagrant"
+  ssh_password           = "BUILDONLY-will-be-rotated"
+  ssh_port               = 22
+  ssh_wait_timeout       = "45m"
   ssh_handshake_attempts = 200
 
   shutdown_command = "echo 'BUILDONLY-will-be-rotated' | sudo -S shutdown -P now"
-  accelerator    = "kvm"
-  disk_interface = "virtio"
-  net_device     = "virtio-net"
-  format         = "qcow2"
-  headless       = true
+  accelerator      = "kvm"
+  disk_interface   = "virtio"
+  net_device       = "virtio-net"
+  format           = "qcow2"
+  headless         = true
 }
 
 # ─── Build ─────────────────────────────────────────────────────────────
 build {
-  name    = "socool-wazuh"
+  name = "socool-wazuh"
   sources = [
     "source.virtualbox-iso.vm",
     "source.qemu.vm",
@@ -127,7 +127,7 @@ build {
       "${path.root}/scripts/rotate-credentials.sh",
       "${path.root}/scripts/cleanup.sh",
     ]
-    execute_command = "echo 'BUILDONLY-will-be-rotated' | {{ .Vars }} sudo -S -E bash '{{ .Path }}'"
+    execute_command   = "echo 'BUILDONLY-will-be-rotated' | {{ .Vars }} sudo -S -E bash '{{ .Path }}'"
     expect_disconnect = true
     env = {
       "SOCOOL_WAZUH_VERSION" = var.wazuh_version
@@ -141,8 +141,8 @@ build {
   }
 
   post-processor "vagrant" {
-    provider_override = var.hypervisor == "virtualbox" ? "virtualbox" : "libvirt"
-    output            = "${var.output_dir}/${local.vm_name}.box"
+    provider_override   = var.hypervisor == "virtualbox" ? "virtualbox" : "libvirt"
+    output              = "${var.output_dir}/${local.vm_name}.box"
     keep_input_artifact = false
   }
 

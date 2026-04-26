@@ -16,7 +16,7 @@ and duplicated here for quick reference.
 | `10` | `scripts/preflight/run-all.sh` | aggregate preflight failure | See individual check codes above this one in the output |
 | `11` | `check-os-arch` | unsupported host OS/arch | [ADR-0002](./adr/0002-hypervisor-matrix.md) matrix |
 | `12` | `check-cpu-virt` | VT-x / AMD-V not enabled | Enable Intel VT-x or AMD-V in BIOS/UEFI, reboot |
-| `13` | `check-nested-virt` | nested virt unavailable | Linux: `echo 'options kvm_intel nested=1' | sudo tee /etc/modprobe.d/kvm.conf && sudo modprobe -r kvm_intel && sudo modprobe kvm_intel`. Alternatively, skip the scanner with `SOCOOL_SCANNER=none`. |
+| `13` | `check-nested-virt` | nested virt unavailable | Linux: `echo 'options kvm_intel nested=1' \| sudo tee /etc/modprobe.d/kvm.conf && sudo modprobe -r kvm_intel && sudo modprobe kvm_intel`. Alternatively, skip the scanner with `SOCOOL_SCANNER=none`. |
 | `14` | `check-memory` | host RAM below lab total | Close other apps, or reduce per-VM `ram_mb` in `config/lab.yml` |
 | `15` | `check-disk` | host disk below lab total | Free space or set `SOCOOL_BOX_OUTPUT_DIR` to a bigger volume |
 | `16` | `check-hypervisor-conflict` | Windows: Hyper-V / WSL2 / Docker Desktop enabled | See [Windows Hyper-V conflict](#windows-hyper-v-conflict) below |
@@ -89,7 +89,7 @@ brew install bash
 
 The system `/bin/bash` is intentionally left alone.
 
-### HashiCorp apt/dnf repo
+### HashiCorp apt-dnf repo
 
 **Symptom:** `setup.sh` exits 21 with an apt/dnf refusal message.
 

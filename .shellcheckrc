@@ -1,0 +1,20 @@
+# .shellcheckrc — repo-wide shellcheck config.
+#
+# CI runs shellcheck with --severity=error so the rules below only
+# matter when contributors run shellcheck locally at default severity.
+# We disable a small set of rules that produce false positives in
+# SOCool's idioms:
+#
+#   SC1090  Non-constant source paths. We source $env_file and similar
+#           by design (load_env, dynamic dispatch). Audited manually.
+#   SC1091  Sourcing files outside the workspace shellcheck can find,
+#           e.g. when scripts are run from the user's checkout.
+#   SC2154  "Variable referenced but not assigned." Common false
+#           positive when variables are exported from common.sh and
+#           consumed inside `python3 -` heredocs.
+#
+# Re-enable any of these in a follow-up PR once the underlying script
+# pattern is reworked.
+
+disable=SC1090,SC1091,SC2154
+external-sources=true

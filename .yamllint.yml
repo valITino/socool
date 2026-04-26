@@ -1,0 +1,33 @@
+# .yamllint.yml — yamllint configuration for SOCool.
+#
+# Slightly relaxed from the default to accommodate:
+#   - GitHub Actions YAML uses `on:` as a key (truthy collision)
+#   - Long inline comments in config/lab.yml documenting fields
+#   - Mixed comment indentation in workflow steps
+#
+# Strict mode is enabled in CI (`yamllint --strict`) so warnings fail
+# the build. If a rule starts producing noise without flagging real
+# issues, change it here with a one-line rationale.
+---
+extends: default
+
+ignore: |
+  .git/
+
+rules:
+  document-start: disable
+  comments-indentation: disable
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    check-keys: false
+  line-length:
+    max: 120
+    level: warning
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+  braces:
+    max-spaces-inside: 1
+  brackets:
+    max-spaces-inside: 1

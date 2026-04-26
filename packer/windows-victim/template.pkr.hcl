@@ -25,14 +25,14 @@ locals {
 
 # ─── Source: VirtualBox ─────────────────────────────────────────────────
 source "virtualbox-iso" "vm" {
-  vm_name              = local.vm_name
-  guest_os_type        = "Windows11_64"
-  iso_url              = var.windows_iso_url
-  iso_checksum         = var.windows_iso_checksum
-  iso_target_path      = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/windows-11-eval.iso"
+  vm_name         = local.vm_name
+  guest_os_type   = "Windows11_64"
+  iso_url         = var.windows_iso_url
+  iso_checksum    = var.windows_iso_checksum
+  iso_target_path = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/windows-11-eval.iso"
 
-  cpus     = var.cpus
-  memory   = var.ram_mb
+  cpus      = var.cpus
+  memory    = var.ram_mb
   disk_size = var.disk_gb * 1024
 
   # autounattend.xml is served as a CD ROM / floppy image. VirtualBox
@@ -77,13 +77,13 @@ source "virtualbox-iso" "vm" {
 
 # ─── Source: QEMU / libvirt ────────────────────────────────────────────
 source "qemu" "vm" {
-  vm_name          = local.vm_name
-  iso_url          = var.windows_iso_url
-  iso_checksum     = var.windows_iso_checksum
-  iso_target_path  = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/windows-11-eval.iso"
+  vm_name         = local.vm_name
+  iso_url         = var.windows_iso_url
+  iso_checksum    = var.windows_iso_checksum
+  iso_target_path = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/windows-11-eval.iso"
 
-  cpus     = var.cpus
-  memory   = var.ram_mb
+  cpus      = var.cpus
+  memory    = var.ram_mb
   disk_size = "${var.disk_gb}G"
 
   http_directory = "${path.root}/http"
@@ -121,7 +121,7 @@ source "qemu" "vm" {
 
 # ─── Build ─────────────────────────────────────────────────────────────
 build {
-  name    = "socool-windows-victim"
+  name = "socool-windows-victim"
   sources = [
     "source.virtualbox-iso.vm",
     "source.qemu.vm",
@@ -147,8 +147,8 @@ build {
   }
 
   post-processor "vagrant" {
-    provider_override = var.hypervisor == "virtualbox" ? "virtualbox" : "libvirt"
-    output            = "${var.output_dir}/${local.vm_name}.box"
+    provider_override   = var.hypervisor == "virtualbox" ? "virtualbox" : "libvirt"
+    output              = "${var.output_dir}/${local.vm_name}.box"
     keep_input_artifact = false
   }
 

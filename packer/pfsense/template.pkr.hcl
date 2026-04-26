@@ -27,10 +27,10 @@ packer {
 locals {
   vm_name = "socool-pfsense-${var.box_version}"
   # Netgate's atxfiles mirror is the canonical source for CE ISOs.
-  iso_url_gz    = "https://atxfiles.netgate.com/mirror/downloads/pfSense-CE-${var.pfsense_version}-RELEASE-amd64.iso.gz"
+  iso_url_gz = "https://atxfiles.netgate.com/mirror/downloads/pfSense-CE-${var.pfsense_version}-RELEASE-amd64.iso.gz"
   # Netgate publishes a SHA256 file alongside the .iso.gz. Packer's
   # `file:` prefix fetches the live value at build time.
-  iso_checksum  = "file:${local.iso_url_gz}.sha256"
+  iso_checksum = "file:${local.iso_url_gz}.sha256"
 }
 
 # ─── Source: VirtualBox ─────────────────────────────────────────────────
@@ -42,8 +42,8 @@ source "virtualbox-iso" "vm" {
   iso_target_extension = "iso.gz"
   iso_target_path      = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/pfsense-${var.pfsense_version}.iso.gz"
 
-  cpus     = var.cpus
-  memory   = var.ram_mb
+  cpus      = var.cpus
+  memory    = var.ram_mb
   disk_size = var.disk_gb * 1024
 
   # Three NICs matching the lab's three networks: WAN simulated,
@@ -70,25 +70,25 @@ source "virtualbox-iso" "vm" {
   # it. Timings tuned for a real build will likely need adjustment.
   boot_wait = "45s"
   boot_command = [
-    "<enter>",                                # Accept boot menu default
-    "<wait30s>",                              # Wait for installer to load
-    "I<wait>",                                # Install
+    "<enter>",   # Accept boot menu default
+    "<wait30s>", # Wait for installer to load
+    "I<wait>",   # Install
     "<wait5s>",
-    "<f10><wait>",                            # F10 exits keymap config
+    "<f10><wait>", # F10 exits keymap config
     "<wait5s>",
-    "<esc>",                                  # Cancel the disk selection menu
+    "<esc>", # Cancel the disk selection menu
     "<wait5s>",
-    "<leftShiftOn>s<leftShiftOff><wait>",     # Trigger bsdinstall shell (S)
+    "<leftShiftOn>s<leftShiftOff><wait>", # Trigger bsdinstall shell (S)
     "<wait10s>",
     "fetch -o /tmp/installerconfig http://{{ .HTTPIP }}:{{ .HTTPPort }}/installerconfig<enter>",
     "<wait10s>",
-    "exit<enter>",                            # Leaves shell; bsdinstall resumes and uses /tmp/installerconfig
+    "exit<enter>", # Leaves shell; bsdinstall resumes and uses /tmp/installerconfig
   ]
 
-  ssh_username       = "root"
-  ssh_password       = "pfsense"   # pfSense default root password; rotated post-install
-  ssh_port           = 22
-  ssh_wait_timeout   = "45m"       # pfSense install is slow (install + reboot)
+  ssh_username           = "root"
+  ssh_password           = "pfsense" # pfSense default root password; rotated post-install
+  ssh_port               = 22
+  ssh_wait_timeout       = "45m" # pfSense install is slow (install + reboot)
   ssh_handshake_attempts = 200
 
   shutdown_command = "/sbin/shutdown -p now"
@@ -98,14 +98,14 @@ source "virtualbox-iso" "vm" {
 
 # ─── Source: QEMU / libvirt ────────────────────────────────────────────
 source "qemu" "vm" {
-  vm_name          = local.vm_name
-  iso_url          = local.iso_url_gz
-  iso_checksum     = local.iso_checksum
+  vm_name              = local.vm_name
+  iso_url              = local.iso_url_gz
+  iso_checksum         = local.iso_checksum
   iso_target_extension = "iso.gz"
-  iso_target_path  = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/pfsense-${var.pfsense_version}.iso.gz"
+  iso_target_path      = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/pfsense-${var.pfsense_version}.iso.gz"
 
-  cpus     = var.cpus
-  memory   = var.ram_mb
+  cpus      = var.cpus
+  memory    = var.ram_mb
   disk_size = "${var.disk_gb}G"
 
   http_directory = "${path.root}/http"
@@ -125,10 +125,10 @@ source "qemu" "vm" {
     "exit<enter>",
   ]
 
-  ssh_username       = "root"
-  ssh_password       = "pfsense"
-  ssh_port           = 22
-  ssh_wait_timeout   = "45m"
+  ssh_username           = "root"
+  ssh_password           = "pfsense"
+  ssh_port               = 22
+  ssh_wait_timeout       = "45m"
   ssh_handshake_attempts = 200
 
   shutdown_command = "/sbin/shutdown -p now"
@@ -142,7 +142,7 @@ source "qemu" "vm" {
 
 # ─── Build ─────────────────────────────────────────────────────────────
 build {
-  name    = "socool-pfsense"
+  name = "socool-pfsense"
   sources = [
     "source.virtualbox-iso.vm",
     "source.qemu.vm",
@@ -163,7 +163,7 @@ build {
     ]
     # FreeBSD's /bin/sh; pfSense ships neither bash by default nor
     # sudo (root-only). The shell execute_command reflects that.
-    execute_command = "{{ .Vars }} /bin/sh '{{ .Path }}'"
+    execute_command   = "{{ .Vars }} /bin/sh '{{ .Path }}'"
     expect_disconnect = true
   }
 
@@ -174,8 +174,8 @@ build {
   }
 
   post-processor "vagrant" {
-    provider_override = var.hypervisor == "virtualbox" ? "virtualbox" : "libvirt"
-    output            = "${var.output_dir}/${local.vm_name}.box"
+    provider_override   = var.hypervisor == "virtualbox" ? "virtualbox" : "libvirt"
+    output              = "${var.output_dir}/${local.vm_name}.box"
     keep_input_artifact = false
   }
 
