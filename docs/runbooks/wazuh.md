@@ -43,18 +43,28 @@ All values land in `packer/wazuh/artifacts/credentials.json` (gitignored, 0600).
 
 ## Apply the Wazuh API password on first boot
 
-After first `vagrant up`, POST the rotated value to the Wazuh API:
+After first `vagrant up`, POST the rotated value to the Wazuh API.
+The Wazuh package ships with a documented bootstrap username/password
+(both literally `wazuh`) — we use it once below to rotate it, then it
+stops working. Treat that bootstrap pair as a placeholder, not a
+secret:
 
 ```bash
+# One-time bootstrap pair shipped by the Wazuh package — public,
+# documented, and immediately rotated below.
+WAZUH_BOOTSTRAP_USER='wazuh'
+WAZUH_BOOTSTRAP_PASS='wazuh'
+
 NEW_PASS="$(jq -r '.accounts[] | select(.scope | startswith("Wazuh API")) | .password' \
            packer/wazuh/artifacts/credentials.json)"
-curl -k -u wazuh:wazuh -X PUT \
+
+curl -k -u "${WAZUH_BOOTSTRAP_USER}:${WAZUH_BOOTSTRAP_PASS}" -X PUT \
     "https://10.42.20.10:55000/security/users/1" \
     -H 'Content-Type: application/json' \
     -d "{\"password\": \"${NEW_PASS}\"}"
 ```
 
-After this, the default `wazuh:wazuh` stops working.
+After this, the bootstrap pair stops working.
 
 ## How to reach agents
 

@@ -1,0 +1,42 @@
+# .markdownlint-cli2.yaml — markdown lint policy.
+#
+# We disable a wide set of stylistic rules (line length, fenced-code
+# language, bare URLs, etc.) and keep the structural ones that catch
+# real defects: code-span hygiene (MD038), broken link fragments
+# (MD051), and table column-count consistency (MD056).
+#
+# Why so many disables? SOCool's docs are rich prose with embedded
+# command snippets and bare publisher URLs (per CLAUDE.md's reference
+# table). Forcing every fence to declare a language or every URL to
+# be an inline link would not improve readability and would generate
+# busywork instead of catching bugs.
+
+config:
+  default: true
+  # Stylistic / opinionated — disabled.
+  MD013: false  # line length
+  MD022: false  # blanks around headings
+  MD024: false  # duplicate headings (siblings_only is the only useful
+                # form, and it tags valid technical headings as dupes)
+  MD026: false  # trailing punctuation in headings
+  MD031: false  # blanks around fences
+  MD032: false  # blanks around lists
+  MD033: false  # inline HTML
+  MD034: false  # bare URLs (we link to publishers in flat reference
+                # tables; bracket-link for each is just noise)
+  MD036: false  # emphasis as heading
+  MD040: false  # fenced-code language tag
+  MD041: false  # first line top-level heading
+  MD046: false  # code block style
+  MD060: false  # table column style (cli2-only; not portable across
+                # markdownlint versions in CI)
+
+ignores:
+  # External skill-pack docs — vendored, not authored here.
+  - .skills/**
+  # Project governance / changelog / claude memory — hand-curated by
+  # the user, not subject to lint.
+  - CLAUDE.md
+  - CHANGELOG.md
+  - .git/**
+  - node_modules/**

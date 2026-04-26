@@ -6,7 +6,7 @@ variable "hypervisor" {
   }
 }
 
-variable "output_dir"    { type = string }
+variable "output_dir" { type = string }
 variable "iso_cache_dir" {
   type    = string
   default = ""

@@ -6,7 +6,7 @@ variable "hypervisor" {
   }
 }
 
-variable "output_dir"    { type = string }
+variable "output_dir" { type = string }
 variable "iso_cache_dir" {
   type    = string
   default = ""
@@ -16,14 +16,14 @@ variable "box_version" {
   default = "0.1.0"
 }
 variable "ubuntu_release" {
-  type    = string
-  default = "24.04.1"
+  type        = string
+  default     = "24.04.1"
   description = "Ubuntu Server LTS point release (e.g., '24.04.1')."
 }
 
 variable "wazuh_version" {
-  type    = string
-  default = "4.14"
+  type        = string
+  default     = "4.14"
   description = "Wazuh major.minor line; installer pulls latest 4.x.y."
 }
 

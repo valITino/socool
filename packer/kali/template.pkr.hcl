@@ -32,8 +32,8 @@ packer {
 }
 
 locals {
-  vm_name    = "socool-kali-${var.box_version}"
-  iso_url    = "https://cdimage.kali.org/kali-${var.kali_version}/kali-linux-${var.kali_version}-installer-amd64.iso"
+  vm_name = "socool-kali-${var.box_version}"
+  iso_url = "https://cdimage.kali.org/kali-${var.kali_version}/kali-linux-${var.kali_version}-installer-amd64.iso"
   # `file:` lets Packer fetch the publisher's signed SHA256SUMS at build
   # time; no literal checksum ever enters the repo. Kali publishes the
   # SHA256SUMS next to the ISO on cdimage.kali.org.
@@ -42,15 +42,15 @@ locals {
 
 # ─── Source: VirtualBox ─────────────────────────────────────────────────
 source "virtualbox-iso" "vm" {
-  vm_name              = local.vm_name
-  guest_os_type        = "Debian_64"
-  iso_url              = local.iso_url
-  iso_checksum         = local.iso_checksum
-  iso_target_path      = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/kali-${var.kali_version}.iso"
+  vm_name         = local.vm_name
+  guest_os_type   = "Debian_64"
+  iso_url         = local.iso_url
+  iso_checksum    = local.iso_checksum
+  iso_target_path = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/kali-${var.kali_version}.iso"
 
   # Hardware sizing comes from config/lab.yml via run-pipeline.* args.
-  cpus   = var.cpus
-  memory = var.ram_mb
+  cpus      = var.cpus
+  memory    = var.ram_mb
   disk_size = var.disk_gb * 1024
 
   # Packer serves the preseed over HTTP. Port range avoids conflict
@@ -70,15 +70,15 @@ source "virtualbox-iso" "vm" {
   ]
 
   # First-boot account — rotated by scripts/rotate-credentials.sh.
-  ssh_username       = "vagrant"
-  ssh_password       = "BUILDONLY-will-be-rotated"
-  ssh_port           = 22
-  ssh_wait_timeout   = "30m"
+  ssh_username           = "vagrant"
+  ssh_password           = "BUILDONLY-will-be-rotated"
+  ssh_port               = 22
+  ssh_wait_timeout       = "30m"
   ssh_handshake_attempts = 100
 
   shutdown_command = "echo 'BUILDONLY-will-be-rotated' | sudo -S shutdown -P now"
 
-  guest_additions_mode   = "disable"
+  guest_additions_mode    = "disable"
   virtualbox_version_file = ""
 
   vboxmanage = [
@@ -94,13 +94,13 @@ source "virtualbox-iso" "vm" {
 
 # ─── Source: QEMU / libvirt ────────────────────────────────────────────
 source "qemu" "vm" {
-  vm_name          = local.vm_name
-  iso_url          = local.iso_url
-  iso_checksum     = local.iso_checksum
-  iso_target_path  = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/kali-${var.kali_version}.iso"
+  vm_name         = local.vm_name
+  iso_url         = local.iso_url
+  iso_checksum    = local.iso_checksum
+  iso_target_path = var.iso_cache_dir == "" ? null : "${var.iso_cache_dir}/kali-${var.kali_version}.iso"
 
-  cpus     = var.cpus
-  memory   = var.ram_mb
+  cpus      = var.cpus
+  memory    = var.ram_mb
   disk_size = "${var.disk_gb}G"
 
   http_directory = "${path.root}/http"
@@ -117,15 +117,15 @@ source "qemu" "vm" {
     "<enter>"
   ]
 
-  ssh_username       = "vagrant"
-  ssh_password       = "BUILDONLY-will-be-rotated"
-  ssh_port           = 22
-  ssh_wait_timeout   = "30m"
+  ssh_username           = "vagrant"
+  ssh_password           = "BUILDONLY-will-be-rotated"
+  ssh_port               = 22
+  ssh_wait_timeout       = "30m"
   ssh_handshake_attempts = 100
 
   shutdown_command = "echo 'BUILDONLY-will-be-rotated' | sudo -S shutdown -P now"
 
-  accelerator   = "kvm"
+  accelerator    = "kvm"
   disk_interface = "virtio"
   net_device     = "virtio-net"
   format         = "qcow2"
@@ -134,7 +134,7 @@ source "qemu" "vm" {
 
 # ─── Build ─────────────────────────────────────────────────────────────
 build {
-  name    = "socool-kali"
+  name = "socool-kali"
   sources = [
     "source.virtualbox-iso.vm",
     "source.qemu.vm",
@@ -150,7 +150,7 @@ build {
       "${path.root}/scripts/rotate-credentials.sh",
       "${path.root}/scripts/cleanup.sh",
     ]
-    execute_command = "echo 'BUILDONLY-will-be-rotated' | {{ .Vars }} sudo -S -E bash '{{ .Path }}'"
+    execute_command   = "echo 'BUILDONLY-will-be-rotated' | {{ .Vars }} sudo -S -E bash '{{ .Path }}'"
     expect_disconnect = true
   }
 
@@ -166,8 +166,8 @@ build {
   }
 
   post-processor "vagrant" {
-    provider_override = var.hypervisor == "virtualbox" ? "virtualbox" : "libvirt"
-    output            = "${var.output_dir}/${local.vm_name}.box"
+    provider_override   = var.hypervisor == "virtualbox" ? "virtualbox" : "libvirt"
+    output              = "${var.output_dir}/${local.vm_name}.box"
     keep_input_artifact = false
   }
 

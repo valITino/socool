@@ -70,16 +70,22 @@ jobs:
           Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
       - name: Run analyzer
         shell: pwsh
+        # Settings come from PSScriptAnalyzerSettings.psd1 at the repo
+        # root: severity = Error, with a small list of repo-wide rule
+        # exclusions documented inline in that file. Also skip the
+        # PSScriptAnalyzer module's own .psd1, which gets picked up
+        # by the recursive scan on Linux runners.
         run: |
           $ErrorActionPreference = 'Stop'
           $sep = [IO.Path]::DirectorySeparatorChar
           $gitSegment = [regex]::Escape($sep + '.git' + $sep)
           $files = Get-ChildItem -Recurse -Include '*.ps1','*.psm1','*.psd1' -File `
-            | Where-Object { $_.FullName -notmatch $gitSegment }
+            | Where-Object { $_.FullName -notmatch $gitSegment } `
+            | Where-Object { $_.Name -ne 'PSScriptAnalyzerSettings.psd1' }
           if (-not $files) { Write-Host 'No PowerShell files found.'; exit 0 }
           $diagnostics = @()
           foreach ($file in $files) {
-            $diag = Invoke-ScriptAnalyzer -Path $file.FullName -Severity @('Error','Warning')
+            $diag = Invoke-ScriptAnalyzer -Path $file.FullName -Settings ./PSScriptAnalyzerSettings.psd1
             if ($diag) { $diagnostics += $diag }
           }
           if ($diagnostics) {
@@ -196,19 +202,19 @@ jobs:
           tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
           sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
           gitleaks version
+      # Config + repo-specific allowlist: .gitleaks.toml at the root.
       - name: Scan working tree
-        run: gitleaks detect --no-banner --redact --verbose --exit-code 1 --source .
+        run: gitleaks detect --no-banner --redact --verbose --exit-code 1 --source . --config .gitleaks.toml
       - name: Scan commit history
-        run: gitleaks detect --no-banner --redact --verbose --exit-code 1 --log-opts="--all"
+        run: gitleaks detect --no-banner --redact --verbose --exit-code 1 --log-opts="--all" --config .gitleaks.toml
 
   markdown-lint:
     name: markdownlint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Config (rules + ignores) lives in .markdownlint-cli2.yaml.
+      # The action scans **/*.md and applies that config.
       - uses: DavidAnson/markdownlint-cli2-action@v17
         with:
-          globs: |
-            **/*.md
-            !**/node_modules/**
-            !.git/**
+          globs: '**/*.md'

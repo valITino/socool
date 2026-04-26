@@ -1,0 +1,22 @@
+# .gitleaks.toml — extends the default gitleaks ruleset with a
+# narrow allowlist for one documented case.
+#
+# Anything matching the default rules is still flagged unless it falls
+# inside one of the regions below. Add new entries with a one-line
+# rationale; if a rule fires legitimately, fix the source — never
+# widen the allowlist as a shortcut.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "SOCool documented allowlist"
+
+# The Wazuh package ships with a literal bootstrap pair `wazuh:wazuh`
+# (publicly documented at https://documentation.wazuh.com/). The
+# runbook shows the one-time API call that rotates it. This path is
+# the only place the literal pair appears, and the very next sentence
+# disables the credential.
+paths = [
+  '''docs/runbooks/wazuh\.md''',
+]
