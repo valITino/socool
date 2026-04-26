@@ -243,6 +243,6 @@ jobs:
       - uses: actions/checkout@v4
       # Config (rules + ignores) lives in .markdownlint-cli2.yaml.
       # The action scans **/*.md and applies that config.
-      - uses: DavidAnson/markdownlint-cli2-action@v17
+      - uses: DavidAnson/markdownlint-cli2-action@v23
         with:
           globs: '**/*.md'
