@@ -31,6 +31,13 @@ and duplicated here for quick reference.
 | `60–63` | credentials | CSPRNG or manifest write failure | Check `umask`; verify `openssl` / `RandomNumberGenerator` is available |
 | `64` | prompts (any) | non-interactive run missing a required `SOCOOL_*` var | The error line names the var — set it in `.env` or pass `--<flag>` |
 | `70–79` | smoke tests | post-boot health probe failed | Named per VM; see [`tests/smoke/probes/`](../tests/smoke/probes/) |
+| `80` | `uninstall.{sh,ps1}` | `vagrant destroy` failed mid-uninstall | `cd vagrant && vagrant status` to inspect; resolve the failing VM, then re-run uninstall |
+| `81` | `uninstall.{sh,ps1}` | `vagrant box remove` failed for a `socool-*` box | Run the printed `vagrant box remove` command manually to see the underlying error |
+| `82` | `uninstall.{sh,ps1}` | `vagrant plugin uninstall` failed | Run `vagrant plugin uninstall vagrant-libvirt` directly |
+| `83` | `uninstall.{sh,ps1}` | cache / artifacts cleanup failed | Filesystem-level error; check perms on `.socool-cache/` and `packer/*/artifacts/` |
+| `84` | `uninstall.{sh,ps1}` | user aborted at a confirmation prompt | Re-run with `--yes` to skip prompts, or answer `y` |
+| `85` | `uninstall.{sh,ps1}` | host package uninstall failed | The error includes the package and command; re-run interactively to see the package manager's prompt |
+| `86` | `uninstall.{sh,ps1}` | `.env` removal failed | `.env` may be open in another process; close it and re-run |
 
 ## Common failure modes
 
@@ -156,6 +163,41 @@ Never commit these files. See
 [`.skills/devsecops/SKILL.md`](../.skills/devsecops/SKILL.md)
 and the per-VM runbook under [`docs/runbooks/`](./runbooks/) for the
 credentials policy.
+
+### Uninstall didn't reclaim disk space
+
+**Symptom:** `./uninstall.sh` finished cleanly, but `du -sh ~/VirtualBox\ VMs/`
+or `du -sh .socool-cache/` still shows GBs in use.
+
+**Why:** the default uninstall removes the lab VMs and the in-repo cache. It
+does **not** by default remove host packages (packer/vagrant/hypervisor) or
+the `.env` file, and it never removes the repo directory itself.
+
+**Fix:**
+
+```bash
+./uninstall.sh --all --yes        # VMs + boxes + plugins + cache + .env + host pkgs
+cd .. && rm -rf -- socool/        # then remove the repo clone itself
+```
+
+Also check `VBoxManage list hostonlyifs` — Vagrant deliberately leaves
+host-only adapters in place because they may be shared with other VMs. Remove
+the SOCool ones with `VBoxManage hostonlyif remove <name>` if you don't need
+them.
+
+### Uninstall hangs at "vagrant destroy"
+
+**Symptom:** the uninstall sits at *Uninstall: vagrant destroy* for several
+minutes.
+
+**Why:** Vagrant is trying to gracefully shut down a running VM that's not
+responding (commonly Windows still finishing an update). `vagrant destroy -f`
+will eventually time out and force-stop, but on slow hosts that can take 5+
+minutes.
+
+**Fix:** wait, or open another terminal and force the VM off via the
+hypervisor (`VBoxManage controlvm socool-windows-victim poweroff` or `virsh
+destroy socool-windows-victim`), then re-run the uninstall.
 
 ## Getting more detail
 
