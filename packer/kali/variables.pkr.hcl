@@ -5,7 +5,7 @@ variable "hypervisor" {
   type = string
   validation {
     condition     = contains(["virtualbox", "libvirt"], var.hypervisor)
-    error_message = "hypervisor must be 'virtualbox' or 'libvirt'."
+    error_message = "Hypervisor must be 'virtualbox' or 'libvirt'."
   }
 }
 
