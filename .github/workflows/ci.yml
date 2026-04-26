@@ -118,12 +118,19 @@ jobs:
           version: '1.11.2'
       - name: packer fmt -check (recursive)
         run: packer fmt -check -recursive packer/
-      - name: packer init + validate (each template)
-        # validate needs every variable without a default in scope. We
-        # pass placeholders for everything required; validate is a
-        # syntactic + reference check, not a build, so the values just
-        # need to be type-correct. Two passes (virtualbox + libvirt)
-        # exercise both source blocks.
+      - name: packer validate -syntax-only (each template)
+        # `-syntax-only` skips plugin loading: no `packer init`, no
+        # network round-trips to api.github.com for plugin tags. This
+        # makes the job fast (~10s) and immune to plugin-publisher
+        # outages or API rate limits, while still catching:
+        #   - HCL2 syntax errors
+        #   - validation-block error_message formatting
+        #   - undeclared variable references
+        #   - missing required variables (no-default vars not in scope)
+        #
+        # What it misses: plugin-specific argument validation (a
+        # misspelled VBoxManage option would only surface at full
+        # `packer validate`). Worth the tradeoff for CI stability.
         #
         # Required-var inventory (no defaults):
         #   all VMs          hypervisor, output_dir
@@ -151,12 +158,11 @@ jobs:
             echo "== $vm_name =="
             (
               cd "$tpl_dir"
-              packer init .
-              packer validate \
+              packer validate -syntax-only \
                 -var "hypervisor=virtualbox" \
                 -var "output_dir=/tmp/socool-validate" \
                 "${extra_vars[@]}" .
-              packer validate \
+              packer validate -syntax-only \
                 -var "hypervisor=libvirt" \
                 -var "output_dir=/tmp/socool-validate" \
                 "${extra_vars[@]}" .
