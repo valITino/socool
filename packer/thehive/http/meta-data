@@ -1,0 +1,2 @@
+# packer/thehive/http/meta-data — intentionally empty. The file MUST
+# exist (Subiquity checks for it) but carries no content for our lab.

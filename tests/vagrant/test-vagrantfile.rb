@@ -144,8 +144,8 @@ class VagrantfileTest < Minitest::Test
   def test_boot_order_ascending
     cfg = load_vagrantfile_with_env('SOCOOL_SCANNER' => 'none')
     names = cfg.nodes.map(&:name).map(&:to_s)
-    assert_equal %w[pfsense kali windows-victim wazuh], names,
-      "VMs must be defined in boot_order (pfsense=0, kali=10, windows-victim=20, wazuh=30)"
+    assert_equal %w[pfsense kali windows-victim wazuh thehive], names,
+      "VMs must be defined in boot_order (pfsense=0, kali=10, windows-victim=20, wazuh=30, thehive=35)"
   end
 
   def test_scanner_filter_none
@@ -183,7 +183,7 @@ class VagrantfileTest < Minitest::Test
 
   def test_non_pfsense_vms_have_one_private_network
     cfg = load_vagrantfile_with_env('SOCOOL_SCANNER' => 'none')
-    %w[kali windows-victim wazuh].each do |name|
+    %w[kali windows-victim wazuh thehive].each do |name|
       node = cfg.nodes.find { |n| n.name.to_s == name }
       priv_nets = node.vm.networks.select { |t, _| t == :private_network }
       assert_equal 1, priv_nets.length, "#{name} should have exactly one private network, found #{priv_nets.length}"

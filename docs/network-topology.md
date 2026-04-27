@@ -32,12 +32,14 @@ flowchart LR
     subgraph mgmt_net ["socool-management — 10.42.20.0/24"]
         wazuh["wazuh<br/>10.42.20.10"]
         scanner["nessus &nbsp;OR&nbsp; openvas<br/>10.42.20.20"]
+        thehive["thehive<br/>10.42.20.30"]
     end
 
     pflan --- kali
     pflan --- wvic
     pfmgmt --- wazuh
     pfmgmt --- scanner
+    pfmgmt --- thehive
 
     host -.-> lan_net
     host -.-> mgmt_net
@@ -54,7 +56,7 @@ not bridge to the host's physical interface.
 |---|---|---|---|
 | `wan-sim` | `198.18.0.0/24` | pfSense WAN interface | Simulated Internet. Uses the RFC 2544 benchmark range so accidental escape cannot hit real Internet. Served by the hypervisor's NAT gateway. |
 | `socool-lan` | `10.42.10.0/24` | Kali (`.10`), Windows victim (`.20`), pfSense LAN (`.1`) | Attacker + victim subnet |
-| `socool-management` | `10.42.20.0/24` | Wazuh (`.10`), Nessus or OpenVAS (`.20`), pfSense MGMT (`.1`) | SIEM + scanner out-of-band |
+| `socool-management` | `10.42.20.0/24` | Wazuh (`.10`), Nessus or OpenVAS (`.20`), TheHive (`.30`), pfSense MGMT (`.1`) | SIEM + scanner + case management out-of-band |
 
 ## Firewall zones (pfSense seed policy)
 
@@ -86,6 +88,7 @@ NICs are wired per [`vagrant/Vagrantfile`](../vagrant/Vagrantfile):
 | windows-victim | NAT | `socool-lan` (10.42.10.20) | — |
 | wazuh | NAT | `socool-management` (10.42.20.10) | — |
 | nessus / openvas | NAT | `socool-management` (10.42.20.20) | — |
+| thehive | NAT | `socool-management` (10.42.20.30) | — |
 
 ### Default route — known caveat
 
@@ -102,7 +105,7 @@ From the host:
 
 ```bash
 # Each VM reachable on its host-only IP?
-for ip in 10.42.10.1 10.42.10.10 10.42.10.20 10.42.20.1 10.42.20.10 10.42.20.20; do
+for ip in 10.42.10.1 10.42.10.10 10.42.10.20 10.42.20.1 10.42.20.10 10.42.20.20 10.42.20.30; do
     timeout 3 bash -c "</dev/tcp/$ip/22" 2>/dev/null && echo "$ip OK" || echo "$ip unreachable"
 done
 

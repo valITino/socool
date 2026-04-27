@@ -2,8 +2,9 @@
 
 A one-command SOC lab provisioner. Clone, run `setup.sh` (Linux/macOS) or
 `setup.ps1` (Windows), and you end up with a networked lab of Kali, pfSense, a
-Windows victim, Wazuh (SIEM), and optionally Nessus or OpenVAS (vulnerability
-scanner) running on VirtualBox or QEMU/KVM.
+Windows victim, Wazuh (SIEM), TheHive 5 Community (case management / SOAR),
+and optionally Nessus or OpenVAS (vulnerability scanner) running on VirtualBox
+or QEMU/KVM.
 
 > Status: early development. The repo layout, governance model, and initial
 > configuration are in place; provisioning pipelines land in later milestones.
@@ -17,6 +18,7 @@ scanner) running on VirtualBox or QEMU/KVM.
 | `kali` | Attacker workstation | Offensive Security official Vagrant box / ISO | `lan` |
 | `windows-victim` | Target endpoint with Wazuh agent | Microsoft Windows dev eval VM | `lan` |
 | `wazuh` | All-in-one SIEM (manager + indexer + dashboard) | Wazuh official RPM/DEB repos | `management` |
+| `thehive` | TheHive 5 Community — case management / SOAR | StrangeBee official Docker Compose stack | `management` |
 | `nessus` / `openvas` | Vulnerability scanner (optional; pick one or skip) | Tenable or Greenbone official | `management` |
 
 Full component runbooks land under [`docs/runbooks/`](./docs/runbooks/) in a
@@ -70,8 +72,8 @@ phase list, safety rules, and exit codes.
 | Resource | Minimum (base lab, no scanner) | With scanner | Recommended |
 |---|---|---|---|
 | CPU | 4 physical cores with VT-x / AMD-V | 4 cores | 8 cores |
-| RAM free | 22 GB (17 GB VMs + 4 GB host headroom + margin) | 26 GB | 32 GB |
-| Disk free | 190 GB (168 GB VMs + 20 GB headroom) | 230 GB | 500 GB SSD |
+| RAM free | 30 GB (25 GB VMs + 4 GB host headroom + margin) | 34 GB | 48 GB |
+| Disk free | 250 GB (228 GB VMs + 20 GB headroom) | 290 GB | 750 GB SSD |
 | Nested virt | — | required | — |
 | Host OS | Linux (x86_64, aarch64), macOS (Intel, Apple Silicon), Windows 10/11 (x86_64) | same | Linux x86_64 |
 
@@ -107,6 +109,7 @@ by default**.
     ├── lan      (10.42.10.0/24)   ── pfSense LAN  ─┬── kali
     │                                               └── windows-victim
     └── management (10.42.20.0/24) ── pfSense MGMT ─┬── wazuh
+                                                    ├── thehive
                                                     └── nessus / openvas
 ```
 

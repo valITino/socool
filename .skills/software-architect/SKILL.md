@@ -60,7 +60,7 @@ Do not invent parallel hierarchies. If a new concept does not fit, write an ADR 
 
 ### `config/lab.yml` schema (v1 — bump on breaking change)
 
-Top-level keys: `version`, `network`, `credentials_policy`, `vms`. Each VM entry: `hostname`, `role` (one of: `firewall`, `attacker`, `victim`, `siem`, `scanner`), `box` (Packer output box name), `ip`, `ram_mb`, `cpus`, `disk_gb`, `network_role` (one of: `wan`, `lan`, `dmz`, `management`), `boot_order` (integer; pfSense=0), optional `depends_on` (list of hostnames).
+Top-level keys: `version`, `network`, `credentials_policy`, `vms`. Each VM entry: `hostname`, `role` (one of: `firewall`, `attacker`, `victim`, `siem`, `soar`, `scanner`), `box` (Packer output box name), `ip`, `ram_mb`, `cpus`, `disk_gb`, `network_role` (one of: `wan`, `lan`, `dmz`, `management`), `boot_order` (integer; pfSense=0), optional `depends_on` (list of hostnames).
 
 Every change to this schema requires a version bump and an ADR.
 
