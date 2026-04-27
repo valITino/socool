@@ -43,7 +43,7 @@ jobs:
     name: ShellCheck (bash)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run shellcheck
         # Severity = error catches real bugs without forcing a refactor of
         # pre-existing style warnings. Tighten in a follow-up PR.
@@ -62,7 +62,7 @@ jobs:
     name: PSScriptAnalyzer (PowerShell)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install PSScriptAnalyzer
         shell: pwsh
         run: |
@@ -99,7 +99,7 @@ jobs:
     name: yamllint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
@@ -112,7 +112,7 @@ jobs:
     name: Packer (fmt + validate)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: hashicorp/setup-packer@v3
         with:
           version: '1.11.2'
@@ -173,7 +173,7 @@ jobs:
     name: Ruby syntax (Vagrantfile + tests)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
@@ -190,7 +190,7 @@ jobs:
     name: Tests (run-all.sh)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
@@ -212,7 +212,7 @@ jobs:
     name: Secrets scan (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # gitleaks needs full history to scan commits, not just the
           # working tree.
@@ -240,7 +240,7 @@ jobs:
     name: markdownlint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # Config (rules + ignores) lives in .markdownlint-cli2.yaml.
       # The action scans **/*.md and applies that config.
       - uses: DavidAnson/markdownlint-cli2-action@v17
