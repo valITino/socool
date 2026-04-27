@@ -96,7 +96,7 @@ matching pinned tags for Cassandra `4.1.10`, Elasticsearch
   `/etc/sysctl.d/99-thehive.conf`.
 - **Self-signed cert on the Nginx fronting TheHive.** Browsers
   warn on first connection. Replace `./certificates/server.crt`
-  + `server.key` inside `/opt/thehive/` and restart the stack to
+  and `server.key` inside `/opt/thehive/` and restart the stack to
   use your own certificate.
 - **StrangeBee `init.sh` may prompt interactively.** We pass
   `SERVER_NAME='thehive.socool.lab'` and pipe `</dev/null` so any
