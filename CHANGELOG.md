@@ -14,6 +14,35 @@ first successful end-to-end build on a real hypervisor. See
 
 ### Added
 
+- **TheHive 5 Community Edition VM** — new non-optional `thehive`
+  entry on `socool-management` at `10.42.20.30`, completing the
+  blue-team workflow alongside Wazuh (Wazuh detects → analyst opens
+  a case in TheHive). Built from Ubuntu 24.04 LTS via Subiquity
+  autoinstall, then provisioned with StrangeBee's official
+  `prod1-thehive` Docker Compose profile (Cassandra + Elasticsearch
+  + TheHive + Nginx). Image tags pinned to TheHive `5.7.1`,
+  Cassandra `4.1.10`, Elasticsearch `8.19.11`, Nginx `1.29.5`
+  (latest 5.x line verified 2026-04-27). JVM heaps capped at 1 GB
+  each so the stack fits the 8 GB RAM budget — single-analyst
+  Community workloads run fine at this cap, knobs in
+  `packer/thehive/variables.pkr.hcl` to raise. `vm.max_map_count`
+  is bumped to 262144 inside the VM (Elasticsearch's hard
+  requirement). The default `admin@thehive.local` / `secret`
+  credential is rotated to a CSPRNG value via TheHive's REST API by
+  `socool-thehive-firstboot.service` on first `vagrant up` (same
+  pattern as Greenbone). Community license is **not** baked in —
+  it's per-deployment and not redistributable; the runbook tells
+  the operator to request one (free) at strangebee.com/community
+  and paste it under *Settings → License* after first login. New
+  smoke probe `tests/smoke/probes/thehive.sh` (exit code `76`) and
+  runbook `docs/runbooks/thehive.md`. Vagrantfile, preflight
+  memory/disk checks, and idempotency test pick the new VM up
+  automatically via `config/lab.yml`. README requirements bumped:
+  minimum free RAM 22 → 30 GB, minimum free disk 190 → 250 GB.
+  The schema's `role:` enum gains `soar` (value-level extension,
+  not a shape change). Skills consulted: software-architect,
+  software-engineer, devops, devsecops, secure-coding, qa-tester,
+  documentation.
 - **Uninstall scripts** — `uninstall.sh` and `uninstall.ps1` at the
   repo root, plus shared phase logic under `scripts/uninstall/`.
   Default phases destroy the lab VMs (`vagrant destroy -f`), remove

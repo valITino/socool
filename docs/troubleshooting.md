@@ -31,6 +31,13 @@ and duplicated here for quick reference.
 | `60–63` | credentials | CSPRNG or manifest write failure | Check `umask`; verify `openssl` / `RandomNumberGenerator` is available |
 | `64` | prompts (any) | non-interactive run missing a required `SOCOOL_*` var | The error line names the var — set it in `.env` or pass `--<flag>` |
 | `70–79` | smoke tests | post-boot health probe failed | Named per VM; see [`tests/smoke/probes/`](../tests/smoke/probes/) |
+| `70` | `tests/smoke/probes/pfsense.sh` | pfSense webConfigurator unreachable on `https://10.42.20.1/` | `vagrant ssh pfsense` and check `service nginx status` |
+| `71` | `tests/smoke/probes/kali.sh` | Kali SSH not responding on `10.42.10.10:22` | `vagrant status kali`; if running, `vagrant ssh kali` to check `sshd` |
+| `72` | `tests/smoke/probes/windows-victim.sh` | Windows victim RDP not responding on `10.42.10.20:3389` | Wait — first boot can take several minutes for the OOBE phase to finish |
+| `73` | `tests/smoke/probes/wazuh.sh` | Wazuh dashboard unreachable on `https://10.42.20.10/` | `vagrant ssh wazuh -c 'sudo systemctl status wazuh-dashboard wazuh-indexer wazuh-manager'` |
+| `74` | `tests/smoke/probes/nessus.sh` | Nessus UI unreachable on `https://10.42.20.20:8834/` | `vagrant ssh nessus -c 'sudo systemctl status nessusd'`; first start takes ~5 min |
+| `75` | `tests/smoke/probes/openvas.sh` | Greenbone UI unreachable on `https://10.42.20.20/` | `vagrant ssh openvas -c 'sudo docker compose -f /opt/greenbone/docker-compose.yml ps'` |
+| `76` | `tests/smoke/probes/thehive.sh` | TheHive UI unreachable on `https://10.42.20.30/` | `vagrant ssh thehive -c 'sudo docker compose -f /opt/thehive/docker-compose.yml ps'` — Cassandra + ES warm-up takes ~3 min |
 | `80` | `uninstall.{sh,ps1}` | `vagrant destroy` failed mid-uninstall | `cd vagrant && vagrant status` to inspect; resolve the failing VM, then re-run uninstall |
 | `81` | `uninstall.{sh,ps1}` | `vagrant box remove` failed for a `socool-*` box | Run the printed `vagrant box remove` command manually to see the underlying error |
 | `82` | `uninstall.{sh,ps1}` | `vagrant plugin uninstall` failed | Run `vagrant plugin uninstall vagrant-libvirt` directly |

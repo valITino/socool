@@ -215,6 +215,7 @@ print_final_summary() {
     printf '\nNext steps:\n' >&2
     printf '  - pfSense webConfigurator:  https://10.42.20.1/\n' >&2
     printf '  - Wazuh dashboard:          https://10.42.20.10/\n' >&2
+    printf '  - TheHive web UI:           https://10.42.20.30/\n' >&2
     printf '  - Kali (SSH):               ssh vagrant@10.42.10.10\n' >&2
     printf '  - Windows victim (RDP):     10.42.10.20:3389\n' >&2
     printf '  - Destroy the lab:          (cd vagrant && vagrant destroy -f)\n' >&2

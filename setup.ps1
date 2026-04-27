@@ -190,6 +190,7 @@ function Show-FinalSummary {
     [Console]::Error.WriteLine('Next steps:')
     [Console]::Error.WriteLine('  - pfSense webConfigurator:  https://10.42.20.1/')
     [Console]::Error.WriteLine('  - Wazuh dashboard:          https://10.42.20.10/')
+    [Console]::Error.WriteLine('  - TheHive web UI:           https://10.42.20.30/')
     [Console]::Error.WriteLine('  - Kali (SSH):               ssh vagrant@10.42.10.10')
     [Console]::Error.WriteLine('  - Windows victim (RDP):     10.42.10.20:3389')
     [Console]::Error.WriteLine('  - Destroy the lab:          Push-Location vagrant; vagrant destroy -f; Pop-Location')

@@ -37,7 +37,9 @@
 #
 # vms: list of VM entries, each:
 #   hostname:      DNS-safe, lowercase, matches ^[a-z][a-z0-9-]{0,30}$
-#   role:          one of: firewall, attacker, victim, siem, scanner
+#   role:          one of: firewall, attacker, victim, siem, soar, scanner
+#                  ('soar' = case-management / incident-response platform —
+#                  TheHive sits next to Wazuh as the analyst surface.)
 #   box:           Packer output box name, 'socool-<vm>-<version>'
 #   network_role:  one of: wan, lan, management, multi
 #                  ('multi' = VM has NICs on 2+ networks; see 'interfaces')
@@ -141,6 +143,22 @@ vms:
     cpus: 4
     disk_gb: 60
     boot_order: 30
+    depends_on: [pfsense]
+    optional: false
+
+  # TheHive 5 Community Edition — case management + IR platform that
+  # ingests alerts from Wazuh. Stack is StrangeBee's official Docker
+  # Compose profile (Cassandra + Elasticsearch + TheHive + Nginx).
+  # Heap sizes are tuned down inside packer/thehive/ to fit 8 GB RAM.
+  - hostname: thehive
+    role: soar
+    box: socool-thehive-0.1.0
+    network_role: management
+    ip: 10.42.20.30
+    ram_mb: 8192
+    cpus: 4
+    disk_gb: 60
+    boot_order: 35
     depends_on: [pfsense]
     optional: false
 
